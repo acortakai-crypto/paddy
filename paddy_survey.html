@@ -121,7 +121,7 @@ html, body {
   overflow: hidden;
   background: var(--bg);
 }
-#heatmap { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+#heatmap { position: absolute; top: 0; left: 0; display: block; cursor: crosshair; }
 
 /* ═══ RIGHT PANEL: GPS + 測定 ═══ */
 .right-panel {
@@ -440,7 +440,7 @@ html, body {
         <label>X</label>
         <input type="number" id="gridX" class="mini-input" value="5" min="1" max="30" style="width:44px;flex:none">
         <label>Y</label>
-        <input type="number" id="gridY" class="mini-input" value="5" min="1" max="30" style="width:44px;flex:none">
+        <input type="number" id="gridY" class="mini-input" value="4" min="1" max="30" style="width:44px;flex:none">
         <button class="btn acc" id="btnNewField" style="flex:1">＋作成</button>
       </div>
     </div>
@@ -1006,256 +1006,170 @@ function flashMeasureBtn(msg) {
 //  HEATMAP RENDERER
 // ════════════════════════════════════════════════
 function resizeCanvas() {
-  const r = canvas.parentElement.getBoundingClientRect();
-  canvas.width  = Math.max(Math.round(r.width),  100);
-  canvas.height = Math.max(Math.round(r.height), 100);
+  const W = Math.max(window.innerWidth  - 200 - 220, 100);
+  const H = Math.max(window.innerHeight - 36,  100);
+  canvas.width        = W;
+  canvas.height       = H;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
 }
 
 window.addEventListener('resize', () => { resizeCanvas(); drawHeatmap(); });
+window.addEventListener('orientationchange', () => { setTimeout(()=>{ resizeCanvas(); drawHeatmap(); }, 300); });
 resizeCanvas();
 
 function drawHeatmap() {
   if (!currentField) return;
-  const r = canvas.parentElement.getBoundingClientRect();
-  canvas.width  = Math.max(Math.round(r.width),  100);
-  canvas.height = Math.max(Math.round(r.height), 100);
-  const W = canvas.width, H = canvas.height;
-  const { gridX, gridY, points } = currentField;
+  const W = Math.max(window.innerWidth  - 200 - 220, 100);
+  const H = Math.max(window.innerHeight - 36,  100);
+  canvas.width        = W;
+  canvas.height       = H;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  const { points } = currentField;
   ctx.clearRect(0, 0, W, H);
 
-  if (!points || points.length === 0) {
-    // Empty grid guide
-    drawEmptyGrid(gridX, gridY, W, H);
+  // センター基準点未設定
+  const centerEl = document.getElementById('centerAltDisplay');
+  if (currentField.centerAlt == null) {
+    if (centerEl) { centerEl.textContent = '未記録'; centerEl.style.color = '#ffaa00'; }
+    updateMeasureLabel();
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = '13px Noto Sans JP, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('GPS接続して基準点を設定 → 走行で自動記録', W/2, H/2);
     document.getElementById('statsRow').style.display = 'none';
     return;
   }
 
-  // センター基準点の表示更新
-  const centerEl = document.getElementById('centerAltDisplay');
   if (centerEl) {
-    if (currentField.centerAlt != null) {
-      centerEl.textContent = currentField.centerAlt.toFixed(4) + ' m';
-      centerEl.style.color = '#22c850';
-    } else {
-      centerEl.textContent = '未記録';
-      centerEl.style.color = '#ffaa00';
-    }
+    centerEl.textContent = currentField.centerAlt.toFixed(4) + ' m';
+    centerEl.style.color = '#22c850';
   }
   updateMeasureLabel();
 
-  const alts = points.filter(p => !p.extra).map(p => p.alt);
-  if (alts.length === 0 || currentField.centerAlt == null) {
-    drawEmptyGrid(gridX, gridY, W, H);
+  const measured = points.filter(p => !p.extra);
+  if (measured.length === 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = '13px Noto Sans JP, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('走行して測定点を記録してください', W/2, H/2);
     document.getElementById('statsRow').style.display = 'none';
     return;
   }
 
   const altCenter = currentField.centerAlt;
-  const altMax  = Math.max(...alts);
-  const altMin  = Math.min(...alts);
-  // 最大偏差（センターから最も離れた点）でスケールを決める
-  const maxDev  = Math.max(Math.abs(altMax - altCenter), Math.abs(altMin - altCenter), 0.001);
-  const spread  = maxDev * 2;
+  const alts = measured.map(p => p.alt);
+  const altMax = Math.max(...alts);
+  const altMin = Math.min(...alts);
+  const maxDev = Math.max(Math.abs(altMax - altCenter), Math.abs(altMin - altCenter), 0.001);
+  const spread = maxDev * 2;
 
-  // Update stats
+  // stats更新
   document.getElementById('statsRow').style.display = 'flex';
-  const toC = v => ((v - altCenter) * 100).toFixed(1);
-  const hiCm = ((altMax - altCenter) * 100);
-  const loCm = ((altMin - altCenter) * 100);
+  const hiCm = (altMax - altCenter) * 100;
+  const loCm = (altMin - altCenter) * 100;
   document.getElementById('statHi').textContent    = (hiCm >= 0 ? '+' : '') + hiCm.toFixed(1);
   document.getElementById('statLo').textContent    = (loCm >= 0 ? '+' : '') + loCm.toFixed(1);
   document.getElementById('statRange').textContent = ((altMax - altMin) * 100).toFixed(1);
-  document.getElementById('statPoints').textContent = points.filter(p => !p.extra).length + ' / ' + (gridX * gridY);
-
-  // Legend
+  document.getElementById('statPoints').textContent = measured.length + '点';
   document.getElementById('legHi').textContent = (hiCm >= 0 ? '+' : '') + hiCm.toFixed(1) + ' cm';
   document.getElementById('legLo').textContent = (loCm >= 0 ? '+' : '') + loCm.toFixed(1) + ' cm';
 
-  // グリッドサイズと画面サイズに応じて格子点半径・paddingを動的計算
-  // dotRadiusを縮小しながら全格子点が収まるサイズを探す
-  let dotRadius = 10, padX, padY, plotW, plotH;
-  for (let dr = 10; dr >= 3; dr--) {
-    padX = dr + 14; padY = dr + 14;
-    plotW = W - padX*2; plotH = H - padY*2;
-    let fits = true;
-    for (let r = 0; r < gridY && fits; r++) {
-      for (let cc = 0; cc < gridX && fits; cc++) {
-        const px2 = padX + (cc/(gridX-1||1))*plotW;
-        const py2 = padY + (r /(gridY-1||1))*plotH;
-        if (px2-dr<0||px2+dr>W||py2-dr<0||py2+dr>H) fits = false;
-      }
-    }
-    if (fits) { dotRadius = dr; break; }
-  }
+  // 圃場全体をcanvasいっぱいの正方形で表示（padding 20px）
+  const pad = 20;
+  const size = Math.min(W, H) - pad * 2;
+  const ox = (W - size) / 2;
+  const oy = (H - size) / 2;
 
-  // IDW interpolation onto pixel grid
-  const resolution = 4;  // px per sample
-  const cols = Math.ceil(plotW / resolution);
-  const rows = Math.ceil(plotH / resolution);
+  // 測定点の緯度経度範囲を取得
+  const lats = measured.filter(p => p.lat != null).map(p => p.lat);
+  const lons = measured.filter(p => p.lon != null).map(p => p.lon);
 
-  function cellToPlot(col, row) {
-    return [
-      padX + (col / (gridX - 1 || 1)) * plotW,
-      padY + (row / (gridY - 1 || 1)) * plotH
-    ];
-  }
-
-  // Build known points in plot coords
-  const known = points.filter(p => !p.extra && p.col >= 0).map(p => {
-    const [px, py] = cellToPlot(p.col, p.row);
-    return { px, py, alt: p.alt };
-  });
-
-  const imageData = ctx.createImageData(cols * resolution, rows * resolution);
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const px = padX + c * resolution;
-      const py = padY + r * resolution;
-      const interp = known.length === 1 ? known[0].alt : idw(known, px, py, 2);
-      // norm: 0=最低(blue), 0.5=センター基準(green), 1=最高(red)
+  if (lats.length < 2) {
+    // 緯度経度がない場合は測定順に並べてIDW補間
+    const res = 4;
+    const cols = Math.ceil(size / res);
+    const rows2 = Math.ceil(size / res);
+    const known = measured.map((p, i) => {
+      const gx = currentField.gridX || 5;
+      const gy = currentField.gridY || 4;
+      const col2 = p.col >= 0 ? p.col : i % gx;
+      const row2 = p.row >= 0 ? p.row : Math.floor(i / gx);
+      return {
+        px: ox + (col2 / (gx-1||1)) * size,
+        py: oy + (row2 / (gy-1||1)) * size,
+        alt: p.alt
+      };
+    });
+    const id = ctx.createImageData(cols * res, rows2 * res);
+    for (let r = 0; r < rows2; r++) for (let cc = 0; cc < cols; cc++) {
+      const x = ox + cc * res, y = oy + r * res;
+      const interp = known.length === 1 ? known[0].alt : idw(known, x, y, 2);
       const norm = 0.5 + (interp - altCenter) / spread;
       const [cr, cg, cb] = altColor(norm);
-
-      for (let dy = 0; dy < resolution; dy++) {
-        for (let dx = 0; dx < resolution; dx++) {
-          const idx = ((r * resolution + dy) * (cols * resolution) + (c * resolution + dx)) * 4;
-          imageData.data[idx]   = cr;
-          imageData.data[idx+1] = cg;
-          imageData.data[idx+2] = cb;
-          imageData.data[idx+3] = 220;
-        }
+      for (let dy = 0; dy < res; dy++) for (let dx = 0; dx < res; dx++) {
+        const idx = ((r*res+dy)*(cols*res)+cc*res+dx)*4;
+        id.data[idx]=cr; id.data[idx+1]=cg; id.data[idx+2]=cb; id.data[idx+3]=220;
       }
     }
-  }
+    const oc = new OffscreenCanvas(cols*res, rows2*res);
+    oc.getContext('2d').putImageData(id, 0, 0);
+    ctx.drawImage(oc, ox, oy, size, size);
+  } else {
+    // 緯度経度がある場合は実際の位置でプロット
+    const latMax = Math.max(...lats), latMin = Math.min(...lats);
+    const lonMax = Math.max(...lons), lonMin = Math.min(...lons);
+    const latRange = Math.max(latMax - latMin, 0.00001);
+    const lonRange = Math.max(lonMax - lonMin, 0.00001);
 
-  // Draw heatmap image
-  const offCanvas = new OffscreenCanvas(cols * resolution, rows * resolution);
-  const offCtx = offCanvas.getContext('2d');
-  offCtx.putImageData(imageData, 0, 0);
-  ctx.drawImage(offCanvas, padX, padY, plotW, plotH);
+    const known = measured.filter(p => p.lat != null).map(p => ({
+      px: ox + ((p.lon - lonMin) / lonRange) * size,
+      py: oy + ((latMax - p.lat) / latRange) * size,
+      alt: p.alt
+    }));
 
-  // Grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.lineWidth = 0.5;
-  for (let c = 0; c <= gridX - 1; c++) {
-    const x = padX + (c / (gridX - 1 || 1)) * plotW;
-    ctx.beginPath(); ctx.moveTo(x, padY); ctx.lineTo(x, padY + plotH); ctx.stroke();
-  }
-  for (let r = 0; r <= gridY - 1; r++) {
-    const y = padY + (r / (gridY - 1 || 1)) * plotH;
-    ctx.beginPath(); ctx.moveTo(padX, y); ctx.lineTo(padX + plotW, y); ctx.stroke();
-  }
-
-  // Measured points
-  const allGridPts = [];
-  for (let r = 0; r < gridY; r++) {
-    for (let c = 0; c < gridX; c++) {
-      const pt = points.find(p => p.row === r && p.col === c);
-      const [px, py] = cellToPlot(c, r);
-      allGridPts.push({ r, c, px, py, pt });
-    }
-  }
-
-  allGridPts.forEach(({ r, c, px, py, pt }) => {
-    if (pt) {
-      // Filled dot — measured（dotRadiusで描画）
-      const norm = (pt.alt - altMin) / spread;
+    const res = 4;
+    const cols = Math.ceil(size / res);
+    const rows2 = Math.ceil(size / res);
+    const id = ctx.createImageData(cols * res, rows2 * res);
+    for (let r = 0; r < rows2; r++) for (let cc = 0; cc < cols; cc++) {
+      const x = ox + cc * res, y = oy + r * res;
+      const interp = known.length === 1 ? known[0].alt : idw(known, x, y, 2);
+      const norm = 0.5 + (interp - altCenter) / spread;
       const [cr, cg, cb] = altColor(norm);
-      ctx.beginPath();
-      ctx.arc(px, py, dotRadius, 0, Math.PI * 2);
-      ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Value label
-      const cm = ((pt.alt - altCenter) * 100);
-      ctx.fillStyle = '#fff';
-      ctx.font = `bold ${Math.max(7, Math.min(10, dotRadius))}px JetBrains Mono, monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText((cm >= 0 ? '+' : '') + cm.toFixed(1), px, py);
-    } else {
-      // Empty dot
-      ctx.beginPath();
-      ctx.arc(px, py, Math.max(dotRadius - 1, 3), 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Cell label
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.font = '9px Noto Sans JP, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`(${c+1},${r+1})`, px, py);
-    }
-  });
-
-  // Next target indicator
-  const taken = new Set(points.filter(p => !p.extra).map(p => `${p.row}_${p.col}`));
-  let found = false;
-  for (let r = 0; r < gridY && !found; r++) {
-    for (let c = 0; c < gridX && !found; c++) {
-      if (!taken.has(`${r}_${c}`)) {
-        const [px, py] = cellToPlot(c, r);
-        ctx.beginPath();
-        ctx.arc(px, py, dotRadius + 3, 0, Math.PI * 2);
-        ctx.strokeStyle = '#00d4aa';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 3]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        found = true;
+      for (let dy = 0; dy < res; dy++) for (let dx = 0; dx < res; dx++) {
+        const idx = ((r*res+dy)*(cols*res)+cc*res+dx)*4;
+        id.data[idx]=cr; id.data[idx+1]=cg; id.data[idx+2]=cb; id.data[idx+3]=220;
       }
     }
+    const oc = new OffscreenCanvas(cols*res, rows2*res);
+    oc.getContext('2d').putImageData(id, 0, 0);
+    ctx.drawImage(oc, ox, oy, size, size);
   }
+
+  // 枠線
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ox, oy, size, size);
+
+  // センター基準点マーカー（中心に十字）
+  ctx.strokeStyle = '#ffaa00';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(W/2 - 12, H/2); ctx.lineTo(W/2 + 12, H/2);
+  ctx.moveTo(W/2, H/2 - 12); ctx.lineTo(W/2, H/2 + 12);
+  ctx.stroke();
 }
 
 function drawEmptyGrid(gx, gy, W, H) {
-  let dotRadius = 10;
-  let padX, padY, plotW, plotH;
-  for (let dr = 10; dr >= 3; dr--) {
-    padX = dr + 14; padY = dr + 14;
-    plotW = W - padX*2; plotH = H - padY*2;
-    let fits = true;
-    for (let r = 0; r < gy && fits; r++) for (let col2 = 0; col2 < gx && fits; col2++) {
-      const px2=padX+(col2/(gx-1||1))*plotW, py2=padY+(r/(gy-1||1))*plotH;
-      if(px2-dr<0||px2+dr>W||py2-dr<0||py2+dr>H) fits=false;
-    }
-    if(fits){dotRadius=dr;break;}
-  }
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = 0.5;
-
-  for (let c = 0; c < gx; c++) {
-    for (let r = 0; r < gy; r++) {
-      const px = padX + (c / (gx - 1 || 1)) * plotW;
-      const py = padY + (r / (gy - 1 || 1)) * plotH;
-      ctx.beginPath();
-      ctx.arc(px, py, Math.max(dotRadius - 1, 3), 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  }
-
-  // First point target
-  const px = padX + 0;
-  const py = padY + 0;
-  ctx.beginPath();
-  ctx.arc(px, py, dotRadius + 3, 0, Math.PI * 2);
-  ctx.strokeStyle = '#00d4aa';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([4, 3]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.font = '12px Noto Sans JP, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.font = '13px Noto Sans JP, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('GPS接続してから基準点を設定 → 走行で自動記録', W / 2, H / 2 + 20);
+  ctx.textBaseline = 'middle';
+  ctx.fillText('GPS接続して基準点を設定 → 走行で自動記録', W/2, H/2);
 }
 
 // IDW (Inverse Distance Weighting)
