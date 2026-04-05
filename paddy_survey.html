@@ -1009,8 +1009,10 @@ function flashMeasureBtn(msg) {
 // ════════════════════════════════════════════════
 function resizeCanvas() {
   const wrap = canvas.parentElement;
-  canvas.width  = wrap.clientWidth;
-  canvas.height = wrap.clientHeight;
+  // getBoundingClientRectで実際の表示サイズを取得（スクロールやズームに影響されない）
+  const rect = wrap.getBoundingClientRect();
+  canvas.width  = Math.floor(rect.width)  || wrap.clientWidth;
+  canvas.height = Math.floor(rect.height) || wrap.clientHeight;
 }
 
 window.addEventListener('resize', () => { resizeCanvas(); drawHeatmap(); });
@@ -1071,9 +1073,16 @@ function drawHeatmap() {
   document.getElementById('legHi').textContent = (hiCm >= 0 ? '+' : '') + hiCm.toFixed(1) + ' cm';
   document.getElementById('legLo').textContent = (loCm >= 0 ? '+' : '') + loCm.toFixed(1) + ' cm';
 
-  // Padding: 格子点(半径12px)＋ラベル(14px)が確実に収まる値
-  const padX = 26;
-  const padY = 26;
+  // グリッドサイズと画面サイズに応じて格子点半径・paddingを動的計算
+  // 格子点が画面に確実に収まるよう自動縮小
+  const maxDotR = Math.min(
+    Math.floor(W / (gridX * 2 + 2)),  // 横方向の最大半径
+    Math.floor(H / (gridY * 2 + 2)),  // 縦方向の最大半径
+    12  // 最大12px
+  );
+  const dotRadius = Math.max(maxDotR, 4); // 最小4px
+  const padX = dotRadius + 14;
+  const padY = dotRadius + 14;
   const plotW = W - padX * 2;
   const plotH = H - padY * 2;
 
@@ -1148,11 +1157,11 @@ function drawHeatmap() {
 
   allGridPts.forEach(({ r, c, px, py, pt }) => {
     if (pt) {
-      // Filled dot — measured
+      // Filled dot — measured（dotRadiusで描画）
       const norm = (pt.alt - altMin) / spread;
       const [cr, cg, cb] = altColor(norm);
       ctx.beginPath();
-      ctx.arc(px, py, 8, 0, Math.PI * 2);
+      ctx.arc(px, py, dotRadius, 0, Math.PI * 2);
       ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
       ctx.fill();
       ctx.strokeStyle = '#fff';
@@ -1162,14 +1171,14 @@ function drawHeatmap() {
       // Value label
       const cm = ((pt.alt - altCenter) * 100);
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 10px JetBrains Mono, monospace';
+      ctx.font = `bold ${Math.max(7, Math.min(10, dotRadius))}px JetBrains Mono, monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText((cm >= 0 ? '+' : '') + cm.toFixed(1), px, py);
     } else {
       // Empty dot
       ctx.beginPath();
-      ctx.arc(px, py, 6, 0, Math.PI * 2);
+      ctx.arc(px, py, Math.max(dotRadius - 1, 3), 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(255,255,255,0.35)';
       ctx.lineWidth = 1;
       ctx.stroke();
@@ -1191,7 +1200,7 @@ function drawHeatmap() {
       if (!taken.has(`${r}_${c}`)) {
         const [px, py] = cellToPlot(c, r);
         ctx.beginPath();
-        ctx.arc(px, py, 12, 0, Math.PI * 2);
+        ctx.arc(px, py, dotRadius + 3, 0, Math.PI * 2);
         ctx.strokeStyle = '#00d4aa';
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 3]);
@@ -1204,8 +1213,14 @@ function drawHeatmap() {
 }
 
 function drawEmptyGrid(gx, gy, W, H) {
-  const padX = 26;
-  const padY = 26;
+  const maxDotR = Math.min(
+    Math.floor(W / (gx * 2 + 2)),
+    Math.floor(H / (gy * 2 + 2)),
+    12
+  );
+  const dotRadius = Math.max(maxDotR, 4);
+  const padX = dotRadius + 14;
+  const padY = dotRadius + 14;
   const plotW = W - padX * 2, plotH = H - padY * 2;
 
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -1216,7 +1231,7 @@ function drawEmptyGrid(gx, gy, W, H) {
       const px = padX + (c / (gx - 1 || 1)) * plotW;
       const py = padY + (r / (gy - 1 || 1)) * plotH;
       ctx.beginPath();
-      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.arc(px, py, Math.max(dotRadius - 1, 3), 0, Math.PI * 2);
       ctx.stroke();
     }
   }
@@ -1225,7 +1240,7 @@ function drawEmptyGrid(gx, gy, W, H) {
   const px = padX + 0;
   const py = padY + 0;
   ctx.beginPath();
-  ctx.arc(px, py, 11, 0, Math.PI * 2);
+  ctx.arc(px, py, dotRadius + 3, 0, Math.PI * 2);
   ctx.strokeStyle = '#00d4aa';
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 3]);
