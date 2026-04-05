@@ -1009,9 +1009,7 @@ function flashMeasureBtn(msg) {
 //  HEATMAP RENDERER
 // ════════════════════════════════════════════════
 function resizeCanvas() {
-  const leftW  = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--left-w'))  || 200;
-  const rightW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--right-w')) || 220;
-  canvas.width  = Math.max(window.innerWidth  - leftW - rightW, 100);
+  canvas.width  = Math.max(window.innerWidth  - 200 - 220, 100);
   canvas.height = Math.max(window.innerHeight - 36, 100);
 }
 
@@ -1020,14 +1018,8 @@ resizeCanvas();
 
 function drawHeatmap() {
   if (!currentField) return;
-  // windowサイズから直接計算（offsetHeightが0になる問題を回避）
-  const leftW  = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--left-w'))  || 200;
-  const rightW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--right-w')) || 220;
-  const topH   = 36;
-  const cw = window.innerWidth  - leftW - rightW;
-  const ch = window.innerHeight - topH;
-  canvas.width  = Math.max(cw, 100);
-  canvas.height = Math.max(ch, 100);
+  canvas.width  = Math.max(window.innerWidth  - 200 - 220, 100);
+  canvas.height = Math.max(window.innerHeight - 36, 100);
   const { gridX, gridY, points } = currentField;
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
