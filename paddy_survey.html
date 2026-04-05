@@ -120,11 +120,8 @@ html, body {
   position: relative;
   overflow: hidden;
   background: var(--bg);
-  width: 100%;
-  height: 100%;
-  min-height: 0;
 }
-#heatmap { width: 100%; height: 100%; display: block; cursor: crosshair; }
+#heatmap { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
 
 /* ═══ RIGHT PANEL: GPS + 測定 ═══ */
 .right-panel {
@@ -1009,11 +1006,9 @@ function flashMeasureBtn(msg) {
 //  HEATMAP RENDERER
 // ════════════════════════════════════════════════
 function resizeCanvas() {
-  // visualViewportで実際の表示幅を取得（ズーム・DPR対応）
-  const vw = window.visualViewport ? window.visualViewport.width  : window.innerWidth;
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  canvas.width  = Math.max(Math.round(vw) - 200 - 220, 100);
-  canvas.height = Math.max(Math.round(vh) - 36, 100);
+  const r = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = Math.max(Math.round(r.width),  100);
+  canvas.height = Math.max(Math.round(r.height), 100);
 }
 
 window.addEventListener('resize', () => { resizeCanvas(); drawHeatmap(); });
@@ -1021,19 +1016,12 @@ resizeCanvas();
 
 function drawHeatmap() {
   if (!currentField) return;
-  // visualViewportで実際の表示幅を取得
-  const vw = window.visualViewport ? window.visualViewport.width  : window.innerWidth;
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  canvas.width  = Math.max(Math.round(vw) - 200 - 220, 100);
-  canvas.height = Math.max(Math.round(vh) - 36, 100);
-  const { gridX, gridY, points } = currentField;
+  const r = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = Math.max(Math.round(r.width),  100);
+  canvas.height = Math.max(Math.round(r.height), 100);
   const W = canvas.width, H = canvas.height;
+  const { gridX, gridY, points } = currentField;
   ctx.clearRect(0, 0, W, H);
-  // デバッグ表示（確認後削除）
-  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,300,18);
-  ctx.fillStyle='#00ff00';ctx.font='11px monospace';
-  ctx.textAlign='left';ctx.textBaseline='top';
-  ctx.fillText('W:'+W+' H:'+H+' vw:'+Math.round(vw)+'x'+Math.round(vh), 4, 3);
 
   if (!points || points.length === 0) {
     // Empty grid guide
@@ -1084,17 +1072,21 @@ function drawHeatmap() {
   document.getElementById('legLo').textContent = (loCm >= 0 ? '+' : '') + loCm.toFixed(1) + ' cm';
 
   // グリッドサイズと画面サイズに応じて格子点半径・paddingを動的計算
-  // 格子点が画面に確実に収まるよう自動縮小
-  const maxDotR = Math.min(
-    Math.floor(W / (gridX * 2 + 2)),  // 横方向の最大半径
-    Math.floor(H / (gridY * 2 + 2)),  // 縦方向の最大半径
-    12  // 最大12px
-  );
-  const dotRadius = Math.max(maxDotR, 4); // 最小4px
-  const padX = dotRadius + 14;
-  const padY = dotRadius + 14;
-  const plotW = W - padX * 2;
-  const plotH = H - padY * 2;
+  // dotRadiusを縮小しながら全格子点が収まるサイズを探す
+  let dotRadius = 10, padX, padY, plotW, plotH;
+  for (let dr = 10; dr >= 3; dr--) {
+    padX = dr + 14; padY = dr + 14;
+    plotW = W - padX*2; plotH = H - padY*2;
+    let fits = true;
+    for (let r = 0; r < gridY && fits; r++) {
+      for (let cc = 0; cc < gridX && fits; cc++) {
+        const px2 = padX + (cc/(gridX-1||1))*plotW;
+        const py2 = padY + (r /(gridY-1||1))*plotH;
+        if (px2-dr<0||px2+dr>W||py2-dr<0||py2+dr>H) fits = false;
+      }
+    }
+    if (fits) { dotRadius = dr; break; }
+  }
 
   // IDW interpolation onto pixel grid
   const resolution = 4;  // px per sample
@@ -1223,15 +1215,18 @@ function drawHeatmap() {
 }
 
 function drawEmptyGrid(gx, gy, W, H) {
-  const maxDotR = Math.min(
-    Math.floor(W / (gx * 2 + 2)),
-    Math.floor(H / (gy * 2 + 2)),
-    10
-  );
-  const dotRadius = Math.max(maxDotR, 4);
-  const padX = dotRadius + 14;
-  const padY = dotRadius + 14;
-  const plotW = W - padX * 2, plotH = H - padY * 2;
+  let dotRadius = 10;
+  let padX, padY, plotW, plotH;
+  for (let dr = 10; dr >= 3; dr--) {
+    padX = dr + 14; padY = dr + 14;
+    plotW = W - padX*2; plotH = H - padY*2;
+    let fits = true;
+    for (let r = 0; r < gy && fits; r++) for (let col2 = 0; col2 < gx && fits; col2++) {
+      const px2=padX+(col2/(gx-1||1))*plotW, py2=padY+(r/(gy-1||1))*plotH;
+      if(px2-dr<0||px2+dr>W||py2-dr<0||py2+dr>H) fits=false;
+    }
+    if(fits){dotRadius=dr;break;}
+  }
 
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
   ctx.lineWidth = 0.5;
