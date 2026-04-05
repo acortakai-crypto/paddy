@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高井農園タイムカード</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f0e8;--surf:#fffdf7;--surf2:#f0ead8;--bdr:#d8ccb0;--acc:#4a7c3f;--acc2:#8fbc5a;--alight:#e8f5e0;--dng:#c0392b;--warn:#d4860a;--txt:#2c2416;--muted:#8a7d65;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--txt);font-family:"Noto Sans JP",sans-serif;min-height:100vh;}
+#punchScreen{min-height:100vh;display:flex;flex-direction:column;}
+.ph{background:var(--acc);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
+.ph h1{color:white;font-size:16px;font-weight:700;}
+.ph-right{display:flex;align-items:center;gap:12px;}
+.ph-clock{font-family:"DM Mono",monospace;font-size:24px;color:white;line-height:1;}
+.ph-date{font-size:11px;color:rgba(255,255,255,0.75);text-align:right;margin-top:2px;}
+.admbtn{background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;}
+.working-bar{background:var(--alight);border-bottom:1px solid var(--bdr);padding:10px 16px;display:none;}
+.working-lbl{font-size:10px;color:var(--acc);font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:6px;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{background:white;border:1px solid var(--acc2);border-radius:100px;padding:3px 10px 3px 7px;font-size:12px;display:flex;align-items:center;gap:5px;}
+.chip-dot{width:7px;height:7px;background:var(--acc2);border-radius:50%;animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.staff-sec{padding:18px;flex:1;}
+.sec-lbl{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px;}
+.staff-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;}
+.scard{background:var(--surf);border:2px solid var(--bdr);border-radius:12px;padding:14px 10px 12px;text-align:center;transition:all 0.2s;}
+.scard.working{border-color:var(--acc2);background:var(--alight);}
+.scard-inner{cursor:pointer;}
+.sav{width:42px;height:42px;border-radius:50%;background:var(--surf2);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:var(--acc);border:2px solid var(--bdr);}
+.scard.working .sav{background:white;border-color:var(--acc2);}
+.sname{font-size:13px;font-weight:700;margin-bottom:4px;}
+.sstatus{font-size:10px;font-family:"DM Mono",monospace;color:var(--muted);}
+.sstatus.in{color:var(--acc);font-weight:500;}
+.recbtn{width:100%;margin-top:8px;border-top:1px solid var(--bdr);padding-top:8px;background:var(--surf2);border-left:none;border-right:none;border-bottom:none;border-radius:6px;padding:5px 0;font-size:11px;color:var(--muted);cursor:pointer;font-weight:700;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(44,36,22,0.45);z-index:50;align-items:flex-start;justify-content:flex-end;padding:16px;padding-top:80px;}
+.overlay.open{display:flex;}
+.modal{background:var(--surf);border-radius:18px;padding:22px;width:100%;max-width:310px;box-shadow:0 16px 50px rgba(0,0,0,0.22);animation:slideIn 0.3s cubic-bezier(0.34,1.56,0.64,1);}
+@keyframes slideIn{from{opacity:0;transform:translateX(24px) scale(0.97)}to{opacity:1;transform:translateX(0) scale(1)}}
+.m-name{font-size:20px;font-weight:700;text-align:center;margin-bottom:3px;}
+.m-time{font-family:"DM Mono",monospace;font-size:12px;color:var(--muted);text-align:center;margin-bottom:14px;}
+.m-info{background:var(--surf2);border-radius:10px;padding:12px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;gap:4px;}
+.mi-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:3px;font-family:"DM Mono",monospace;}
+.mi-val{font-family:"DM Mono",monospace;font-size:14px;font-weight:700;color:var(--acc);}
+.m-btns{display:flex;flex-direction:column;gap:8px;}
+.mbox{background:var(--surf2);border-radius:8px;padding:10px;margin-bottom:6px;}
+.mbox-lbl{font-size:10px;font-weight:700;letter-spacing:0.1em;margin-bottom:7px;}
+.mbox-lbl.am{color:var(--acc);}
+.mbox-lbl.pm{color:var(--warn);}
+.mbox-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.mslbl{font-size:10px;color:var(--muted);font-weight:700;display:block;margin-bottom:2px;}
+.msel{display:block;width:100%;padding:8px 4px;border:1px solid var(--bdr);border-radius:7px;font-size:14px;font-family:"DM Mono",monospace;background:var(--surf);color:var(--txt);outline:none;text-align:center;-webkit-appearance:none;appearance:none;}
+.mbtn{padding:13px;border-radius:10px;border:none;font-family:"Noto Sans JP",sans-serif;font-size:14px;font-weight:700;cursor:pointer;}
+.mbtn-save{background:var(--dng);color:white;}
+.mbtn-cancel{background:var(--surf2);color:var(--muted);}
+#adminScreen{display:none;min-height:100vh;flex-direction:column;}
+#adminScreen.open{display:flex;}
+.adm-hdr{background:var(--txt);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;}
+.adm-hdr h2{color:white;font-size:16px;font-weight:700;}
+.back-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;}
+.adm-tabs{display:flex;background:var(--surf2);border-bottom:1px solid var(--bdr);overflow-x:auto;}
+.atab{flex:1;min-width:60px;padding:11px 6px;text-align:center;font-size:12px;font-weight:700;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;}
+.atab.active{color:var(--acc);border-bottom-color:var(--acc);background:var(--surf);}
+.adm-body{padding:18px;flex:1;overflow-y:auto;}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+.mnav{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.mnav-lbl{font-size:15px;font-weight:700;flex:1;}
+.nbtn{background:var(--surf);border:1px solid var(--bdr);width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;color:var(--txt);}
+.sum-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.sum-card{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:13px;text-align:center;}
+.sum-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:5px;font-family:"DM Mono",monospace;}
+.sum-val{font-family:"DM Mono",monospace;font-size:20px;font-weight:500;color:var(--acc);}
+.rep-tbl{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;overflow:hidden;}
+.rep-row{display:grid;grid-template-columns:1fr 56px 70px 70px;padding:11px 14px;font-size:12px;align-items:center;border-bottom:1px solid var(--bdr);}
+.rep-row:last-child{border-bottom:none;}
+.rep-row.hdr{background:var(--surf2);font-family:"DM Mono",monospace;font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;}
+.rep-name{font-weight:700;}
+.rep-num{font-family:"DM Mono",monospace;text-align:right;}
+.rep-num.acc{color:var(--acc);font-weight:500;}
+.rep-num.warn{color:var(--warn);}
+.det-sel{width:100%;padding:10px 14px;border:1px solid var(--bdr);border-radius:10px;background:var(--surf);font-family:"Noto Sans JP",sans-serif;font-size:14px;color:var(--txt);margin-bottom:14px;outline:none;}
+.det-tbl{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;overflow:hidden;}
+.det-row{display:grid;grid-template-columns:48px 1fr 1fr 1fr 1fr 56px 1fr;padding:10px 14px;font-size:12px;align-items:center;border-bottom:1px solid var(--bdr);}
+.det-row:last-child{border-bottom:none;}
+.det-row.hdr{background:var(--surf2);font-family:"DM Mono",monospace;font-size:10px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;}
+.d-dt{color:var(--muted);font-family:"DM Mono",monospace;}
+.d-in{color:var(--acc);font-family:"DM Mono",monospace;}
+.d-out{color:var(--dng);font-family:"DM Mono",monospace;}
+.d-tot{font-family:"DM Mono",monospace;font-weight:500;text-align:right;}
+.add-form{display:flex;gap:8px;margin-bottom:14px;}
+.add-form input{padding:10px 13px;border:1px solid var(--bdr);border-radius:10px;background:var(--surf);font-family:"Noto Sans JP",sans-serif;font-size:14px;color:var(--txt);outline:none;}
+.addbtn{background:var(--acc);color:white;border:none;padding:10px 16px;border-radius:10px;font-family:"Noto Sans JP",sans-serif;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.smng-list{display:flex;flex-direction:column;gap:7px;}
+.smng-item{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.smng-av{width:34px;height:34px;border-radius:50%;background:var(--alight);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--acc);flex-shrink:0;}
+.smng-name{flex:1;font-weight:500;min-width:60px;}
+.delbtn{background:#fdecea;color:var(--dng);border:1px solid rgba(192,57,43,0.2);padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;}
+.exp-btn{width:100%;margin-top:14px;padding:13px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;font-family:"Noto Sans JP",sans-serif;font-size:14px;font-weight:700;color:var(--acc);cursor:pointer;}
+.payslip-card{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:16px;margin-bottom:10px;}
+.ps-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.ps-name{font-size:15px;font-weight:700;}
+.ps-wage{font-size:12px;color:var(--muted);}
+.ps-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
+.ps-stat{background:var(--surf2);border-radius:8px;padding:8px;text-align:center;}
+.ps-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;font-family:"DM Mono",monospace;}
+.ps-val{font-family:"DM Mono",monospace;font-size:15px;font-weight:700;color:var(--acc);}
+.ps-val.pay{color:var(--dng);}
+.print-btn{width:100%;padding:11px;background:var(--acc);color:white;border:none;border-radius:8px;font-family:"Noto Sans JP",sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.empty{text-align:center;padding:28px;color:var(--muted);font-size:13px;}
+#mrScreen{display:none;position:fixed;inset:0;background:rgba(44,36,22,0.4);z-index:40;justify-content:flex-end;}
+#mrScreen.open{display:flex;}
+.mr-panel{width:100%;max-width:360px;background:var(--surf);display:flex;flex-direction:column;height:100%;animation:slideIn 0.3s cubic-bezier(0.34,1.56,0.64,1);}
+.mr-hdr{background:var(--acc);padding:16px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.mr-hdr h2{color:white;font-size:15px;font-weight:700;}
+.mr-back{background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;}
+.mr-body{padding:16px;flex:1;overflow-y:auto;}
+.mr-sum{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.mr-scard{background:var(--bg);border:1px solid var(--bdr);border-radius:10px;padding:12px;text-align:center;}
+.mr-slbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:3px;font-family:"DM Mono",monospace;}
+.mr-sval{font-family:"DM Mono",monospace;font-size:20px;font-weight:700;color:var(--acc);}
+.mr-tbl{background:var(--bg);border:1px solid var(--bdr);border-radius:10px;overflow:hidden;}
+.mr-row{display:grid;grid-template-columns:52px 1fr 1fr 52px;padding:9px 12px;font-size:12px;align-items:center;border-bottom:1px solid var(--bdr);}
+.mr-row:last-child{border-bottom:none;}
+.mr-row.hdr{background:var(--surf2);font-family:"DM Mono",monospace;font-size:9px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;}
+.mr-dt{color:var(--muted);font-family:"DM Mono",monospace;}
+.mr-in{color:var(--acc);font-family:"DM Mono",monospace;}
+.mr-out{color:var(--dng);font-family:"DM Mono",monospace;}
+.mr-tot{font-family:"DM Mono",monospace;font-weight:700;text-align:right;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--txt);color:white;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:700;z-index:200;transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1);white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div id="punchScreen">
+  <div class="ph">
+    <h1>🌿 高井農園タイムカード</h1>
+    <div class="ph-right">
+      <div><div class="ph-clock" id="phClock">--:--:--</div><div class="ph-date" id="phDate"></div></div>
+      <button class="admbtn" onclick="openAdmin()">管理者</button>
+    </div>
+  </div>
+  <div class="working-bar" id="workingBar">
+    <div class="working-lbl">現在勤務中</div>
+    <div class="chips" id="workingChips"></div>
+  </div>
+  <div class="staff-sec">
+    <div class="sec-lbl">名前をタップして打刻してください</div>
+    <div class="staff-grid" id="staffGrid"></div>
+  </div>
+</div>
+
+<div class="overlay" id="punchOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="m-name" id="mName"></div>
+    <div class="m-time" id="mTime"></div>
+    <div class="m-info" id="mInfo"></div>
+    <div class="m-btns" id="mBtns"></div>
+  </div>
+</div>
+
+<div id="adminScreen">
+  <div class="adm-hdr">
+    <h2>🌿 管理者画面</h2>
+    <button class="back-btn" onclick="closeAdmin()">← 打刻画面へ</button>
+  </div>
+  <div class="adm-tabs">
+    <div class="atab active" onclick="switchTab('summary')">月次集計</div>
+    <div class="atab" onclick="switchTab('detail')">個人記録</div>
+    <div class="atab" onclick="switchTab('staff')">スタッフ</div>
+    <div class="atab" onclick="switchTab('payslip')">給与明細</div>
+  </div>
+  <div class="adm-body">
+    <div id="tabSummary" class="tab-content active">
+      <div class="mnav">
+        <button class="nbtn" onclick="changeAdmMonth(-1)">‹</button>
+        <div class="mnav-lbl" id="admLbl1"></div>
+        <button class="nbtn" onclick="changeAdmMonth(1)">›</button>
+      </div>
+      <div class="sum-grid">
+        <div class="sum-card"><div class="sum-lbl">出勤人数</div><div class="sum-val" id="sPeople">0</div></div>
+        <div class="sum-card"><div class="sum-lbl">総勤務時間</div><div class="sum-val" id="sTotal">0:00</div></div>
+        <div class="sum-card"><div class="sum-lbl">延べ出勤日</div><div class="sum-val" id="sDays">0</div></div>
+      </div>
+      <div class="rep-tbl">
+        <div class="rep-row hdr"><div>名前</div><div class="rep-num">出勤日</div><div class="rep-num">勤務時間</div><div class="rep-num">残業</div></div>
+        <div id="repBody"></div>
+      </div>
+      <button class="exp-btn" onclick="exportCSV()">📥 CSVエクスポート</button>
+    </div>
+    <div id="tabDetail" class="tab-content">
+      <div class="mnav">
+        <button class="nbtn" onclick="changeAdmMonth(-1)">‹</button>
+        <div class="mnav-lbl" id="admLbl2"></div>
+        <button class="nbtn" onclick="changeAdmMonth(1)">›</button>
+      </div>
+      <select class="det-sel" id="detSel" onchange="renderDetail()"><option value="">スタッフを選択</option></select>
+      <div class="det-tbl" id="detTbl"><div class="empty">スタッフを選択してください</div></div>
+    </div>
+    <div id="tabStaff" class="tab-content">
+      <div class="add-form">
+        <input type="text" id="newName" placeholder="名前" maxlength="10" style="flex:2">
+        <input type="number" id="newHourly" placeholder="時給" min="0" style="flex:1;min-width:70px">
+        <button class="addbtn" onclick="addStaff()">追加</button>
+      </div>
+      <div class="smng-list" id="smngList"></div>
+    </div>
+    <div id="tabPayslip" class="tab-content">
+      <div class="mnav">
+        <button class="nbtn" onclick="changeAdmMonth(-1)">‹</button>
+        <div class="mnav-lbl" id="admLbl3"></div>
+        <button class="nbtn" onclick="changeAdmMonth(1)">›</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">印刷ボタンで給与明細を印刷できます。事前にスタッフ管理で時給を設定してください。</div>
+      <div id="payslipList"></div>
+    </div>
+  </div>
+</div>
+
+<div id="mrScreen" onclick="handleMrOverlay(event)">
+  <div class="mr-panel">
+    <div class="mr-hdr">
+      <h2 id="mrTitle">勤務記録</h2>
+      <button class="mr-back" onclick="closeMr()">← 戻る</button>
+    </div>
+    <div class="mr-body">
+      <div class="mnav">
+        <button class="nbtn" onclick="changeMrMonth(-1)">‹</button>
+        <div class="mnav-lbl" id="mrMonthLbl"></div>
+        <button class="nbtn" onclick="changeMrMonth(1)">›</button>
+      </div>
+      <div class="mr-sum">
+        <div class="mr-scard"><div class="mr-slbl">出勤日数</div><div class="mr-sval" id="mrDays">0日</div></div>
+        <div class="mr-scard"><div class="mr-slbl">総勤務時間</div><div class="mr-sval" id="mrTotal">0:00</div></div>
+      </div>
+      <div class="mr-tbl" id="mrTbl"><div class="empty">記録がありません</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="pwOverlay" onclick="pwOverlayClick(event)">
+  <div class="modal" style="margin-top:160px">
+    <div style="font-size:16px;font-weight:700;text-align:center;margin-bottom:14px">管理者パスワード</div>
+    <input type="password" id="pwInput" placeholder="パスワードを入力" maxlength="20"
+      style="width:100%;padding:12px 14px;border:1px solid var(--bdr);border-radius:10px;font-size:18px;text-align:center;letter-spacing:0.3em;background:var(--surf);color:var(--txt);outline:none;margin-bottom:10px"
+      onkeydown="if(event.key==='Enter')pwSubmit()">
+    <div id="pwError" style="color:var(--dng);font-size:12px;text-align:center;margin-bottom:8px;display:none">パスワードが違います</div>
+    <button class="mbtn mbtn-save" style="background:var(--acc)" onclick="pwSubmit()">入る</button>
+    <button class="mbtn mbtn-cancel" onclick="pwCancel()" style="margin-top:6px">キャンセル</button>
+  </div>
+</div>
+
+<div id="printScreen" style="display:none;position:fixed;inset:0;background:white;z-index:100;overflow-y:auto;padding:20px">
+  <div style="max-width:640px;margin:0 auto">
+    <button onclick="closePrint()" style="margin-bottom:16px;padding:10px 20px;background:#4a7c3f;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;width:100%">← 管理者画面に戻る</button>
+    <div id="printContent"></div>
+    <button onclick="window.print()" style="margin-top:16px;padding:14px;background:#c0392b;color:white;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;width:100%">🖨 印刷する</button>
+  </div>
+</div>
+
+<style>
+#printContent .hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #333;padding-bottom:5px;margin-bottom:8px;}
+#printContent h1{font-size:14px;margin:0;}
+#printContent .hdr-sub{font-size:9px;color:#666;text-align:right;}
+#printContent .nm{font-size:13px;font-weight:700;margin-bottom:2px;}
+#printContent .wg{font-size:9px;color:#666;margin-bottom:8px;}
+#printContent .sg{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;}
+#printContent .sc{border:1px solid #ccc;border-radius:4px;padding:5px;text-align:center;}
+#printContent .sl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px;}
+#printContent .sv{font-size:13px;font-weight:700;}
+#printContent .sv.pay{color:#c0392b;font-size:15px;}
+#printContent table{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px;}
+#printContent th{background:#f0ead8;padding:4px;text-align:center;border:0.5px solid #bbb;font-weight:700;}
+#printContent td{padding:3px 4px;border:0.5px solid #ddd;text-align:center;}
+#printContent td:last-child{text-align:right;}
+#printContent .footer{font-size:8px;color:#999;text-align:center;margin-top:6px;border-top:0.5px solid #eee;padding-top:4px;}
+@media print {
+  body > *:not(#printScreen) { display: none !important; }
+  #printScreen { position: static !important; padding: 0 !important; }
+  #printScreen button { display: none !important; }
+}
+</style>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var SK='farm_tc_v3';
+function loadState(){try{var r=localStorage.getItem(SK);return r?JSON.parse(r):defState();}catch(e){return defState();}}
+function defState(){return{staff:[{id:'s1',name:'田中 さくら',hourly:1000,hourlyB:1200},{id:'s2',name:'鈴木 健太',hourly:1000,hourlyB:1200},{id:'s3',name:'佐藤 美咲',hourly:1000,hourlyB:1200},{id:'s4',name:'高井 佑典',hourly:1000,hourlyB:1200}],records:{}};}
+var S=loadState();
+var aY=new Date().getFullYear(),aM=new Date().getMonth();
+var selId=null,mrId=null,mrY=new Date().getFullYear(),mrM=new Date().getMonth();
+function save(){localStorage.setItem(SK,JSON.stringify(S));}
+function pad(n){return String(n).padStart(2,'0');}
+function todayKey(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function ft(ts){if(!ts)return'--:--';var d=new Date(ts);return pad(d.getHours())+':'+pad(d.getMinutes());}
+function fmtDur(ms){if(!ms||ms<=0)return'0:00';var m=Math.floor(ms/60000);return Math.floor(m/60)+':'+pad(m%60);}
+function workMs(r){if(!r)return 0;var t=0;if(r.in1&&r.out1)t+=r.out1-r.in1;if(r.in2&&r.out2)t+=r.out2-r.in2;if(t===0&&r.in){var e=r.out?r.out:Date.now();t=Math.max(0,e-r.in);}return Math.max(0,t);}
+function getRec(sid,dk){if(!S.records[sid])S.records[sid]={};return S.records[sid][dk]||null;}
+function round15(s){var p=s.split(':').map(Number),t=Math.round((p[0]*60+p[1])/15)*15;return pad(Math.floor(t/60)%24)+':'+pad(t%60);}
+function makeOpts(sel,blank){var h=blank?'<option value="">--:--</option>':'';for(var i=0;i<24;i++)for(var m=0;m<60;m+=15){var v=pad(i)+':'+pad(m);h+='<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>';}return h;}
+function tsFromStr(dk,tv){var p=dk.split('-').map(Number),t=tv.split(':').map(Number);return new Date(p[0],p[1]-1,p[2],t[0],t[1],0).getTime();}
+
+function updateClock(){var now=new Date(),days=['日','月','火','水','木','金','土'];document.getElementById('phClock').textContent=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());document.getElementById('phDate').textContent=(now.getMonth()+1)+'月'+now.getDate()+'日（'+days[now.getDay()]+'）';}
+
+function renderPunchScreen(){
+  var key=todayKey();
+  var working=S.staff.filter(function(s){var r=getRec(s.id,key);return r&&(r.in1||r.in)&&!(r.out2||r.out1||r.out);});
+  var bar=document.getElementById('workingBar');
+  if(working.length){bar.style.display='block';document.getElementById('workingChips').innerHTML=working.map(function(s){var r=getRec(s.id,key);return '<div class="chip"><div class="chip-dot"></div>'+s.name+'　'+ft(r.in1||r.in)+'〜</div>';}).join('');}
+  else{bar.style.display='none';}
+  var grid=document.getElementById('staffGrid');
+  if(!S.staff.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1">スタッフがいません</div>';return;}
+  grid.innerHTML=S.staff.map(function(s){
+    var r=getRec(s.id,key),iTs=r&&(r.in1||r.in),oTs=r&&(r.out2||r.out1||r.out);
+    var cls='',sCls='',sTxt='未出勤';
+    if(iTs&&!oTs){cls='working';sCls='in';sTxt=ft(iTs)+'〜';}else if(oTs){sTxt='退勤済 '+ft(oTs);}
+    return '<div class="scard '+cls+'"><div class="scard-inner" onclick="openModal(\''+s.id+'\')"><div class="sav">'+s.name.charAt(0)+'</div><div class="sname">'+s.name+'</div><div class="sstatus '+sCls+'">'+sTxt+'</div></div><button class="recbtn" onclick="openMr(\''+s.id+'\')">📋 記録を見る</button></div>';
+  }).join('');
+}
+
+function openModal(sid){
+  selId=sid;
+  var s=S.staff.find(function(x){return x.id===sid;}),key=todayKey(),r=getRec(sid,key);
+  document.getElementById('mName').textContent=s.name;
+  var now=new Date(),nowStr=round15(pad(now.getHours())+':'+pad(now.getMinutes()));
+  document.getElementById('mTime').textContent='現在時刻: '+nowStr;
+  var w1=(r&&r.in1&&r.out1)?(r.out1-r.in1):0,w2=(r&&r.in2&&r.out2)?(r.out2-r.in2):0;
+  document.getElementById('mInfo').innerHTML=
+    '<div><div class="mi-lbl">午前</div><div class="mi-val">'+(w1?fmtDur(w1):'--')+'</div></div>'
+    +'<div><div class="mi-lbl">午後</div><div class="mi-val">'+(w2?fmtDur(w2):'--')+'</div></div>'
+    +'<div><div class="mi-lbl">合計</div><div class="mi-val">'+fmtDur(w1+w2)+'</div></div>';
+  var eI1=(r&&r.in1)?round15(ft(r.in1)):nowStr,eO1=(r&&r.out1)?round15(ft(r.out1)):'';
+  var eI2=(r&&r.in2)?round15(ft(r.in2)):'',eO2=(r&&r.out2)?round15(ft(r.out2)):'';
+  var ss='display:block;width:100%;padding:7px 4px;border:1px solid var(--bdr);border-radius:7px;font-size:14px;font-family:monospace;background:var(--surf);color:var(--txt);outline:none;text-align:center;-webkit-appearance:none;appearance:none';
+  var ls='font-size:10px;color:var(--muted);font-weight:700;display:block;margin-bottom:2px';
+  var btns=document.getElementById('mBtns');
+  btns.innerHTML=
+    '<div class="mbox"><div class="mbox-lbl am">出勤１（午前）</div><div class="mbox-row">'
+    +'<div><span style="'+ls+'">出勤</span><select id="i1" style="'+ss+'">'+makeOpts(eI1,false)+'</select></div>'
+    +'<div><span style="'+ls+'">退勤</span><select id="o1" style="'+ss+'">'+makeOpts(eO1,true)+'</select></div>'
+    +'</div></div>'
+    +'<div class="mbox"><div class="mbox-lbl pm">出勤２（午後）</div><div class="mbox-row">'
+    +'<div><span style="'+ls+'">出勤</span><select id="i2" style="'+ss+'">'+makeOpts(eI2,true)+'</select></div>'
+    +'<div><span style="'+ls+'">退勤</span><select id="o2" style="'+ss+'">'+makeOpts(eO2,true)+'</select></div>'
+    +'</div></div>'
+    +'<div style="margin-bottom:6px">'
+      +'<span style="font-size:10px;color:var(--muted);font-weight:700;display:block;margin-bottom:3px">メモ（特例など）</span>'
+      +'<textarea id="punchMemo" rows="2" placeholder="例：収穫応援のため参加" style="width:100%;padding:7px 9px;border:1px solid var(--bdr);border-radius:7px;font-size:13px;font-family:sans-serif;background:var(--surf);color:var(--txt);outline:none;resize:none;line-height:1.5"></textarea>'
+    +'</div>'
+    +'<button class="mbtn mbtn-save" onclick="savePunch()">打刻を保存</button>'
+    +'<button class="mbtn mbtn-cancel" onclick="closeModal()">キャンセル</button>';
+  // set memo value after DOM is created
+  var memoEl=document.getElementById('punchMemo');
+  if(memoEl)memoEl.value=(r&&r.memo)?r.memo:'';
+  document.getElementById('punchOverlay').classList.add('open');
+}
+function handleOverlayClick(e){if(e.target===document.getElementById('punchOverlay'))closeModal();}
+function closeModal(){document.getElementById('punchOverlay').classList.remove('open');selId=null;}
+
+function savePunch(){
+  var key=todayKey();
+  if(!S.records[selId])S.records[selId]={};
+  if(!S.records[selId][key])S.records[selId][key]={};
+  var r=S.records[selId][key];
+  var i1=document.getElementById('i1').value,o1=document.getElementById('o1').value;
+  var i2=document.getElementById('i2').value,o2=document.getElementById('o2').value;
+  if(!i1){showToast('出勤１の出勤時刻を入力してください');return;}
+  if(o1&&tsFromStr(key,o1)<=tsFromStr(key,i1)){showToast('出勤１：退勤は出勤より後にしてください');return;}
+  if(i2&&o2&&tsFromStr(key,o2)<=tsFromStr(key,i2)){showToast('出勤２：退勤は出勤より後にしてください');return;}
+  r.in1=tsFromStr(key,i1);r.out1=o1?tsFromStr(key,o1):null;r.in2=i2?tsFromStr(key,i2):null;r.out2=o2?tsFromStr(key,o2):null;
+  r.in=r.in1;r.out=r.out2||r.out1||null;r.breakMs=0;var memo=document.getElementById('punchMemo');r.memo=memo?memo.value.trim():'';
+  save();closeModal();renderPunchScreen();if(mrId===selId)renderMr();showToast('打刻を保存しました ✓');
+}
+
+function openAdmin(){
+  document.getElementById('pwInput').value='';
+  document.getElementById('pwError').style.display='none';
+  document.getElementById('pwOverlay').classList.add('open');
+  setTimeout(function(){document.getElementById('pwInput').focus();},100);
+}
+function pwSubmit(){
+  var pw=document.getElementById('pwInput').value;
+  if(pw!=='0412'){
+    document.getElementById('pwError').style.display='block';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
+    return;
+  }
+  document.getElementById('pwOverlay').classList.remove('open');
+  document.getElementById('punchScreen').style.display='none';
+  document.getElementById('adminScreen').classList.add('open');
+  renderAdmin();
+}
+function pwCancel(){
+  document.getElementById('pwOverlay').classList.remove('open');
+}
+function pwOverlayClick(e){
+  if(e.target===document.getElementById('pwOverlay'))pwCancel();
+}
+function closeAdmin(){document.getElementById('adminScreen').classList.remove('open');document.getElementById('punchScreen').style.display='flex';renderPunchScreen();}
+
+function switchTab(tab){
+  document.querySelectorAll('.atab').forEach(function(el,i){el.classList.toggle('active',['summary','detail','staff','payslip'][i]===tab);});
+  document.querySelectorAll('.tab-content').forEach(function(el){el.classList.remove('active');});
+  document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
+  renderAdmin();if(tab==='payslip')renderPayslip();
+}
+function changeAdmMonth(dir){aM+=dir;if(aM<0){aM=11;aY--;}if(aM>11){aM=0;aY++;}renderAdmin();var el=document.getElementById('tabPayslip');if(el&&el.classList.contains('active'))renderPayslip();}
+function renderAdmin(){var lbl=aY+'年'+(aM+1)+'月';['admLbl1','admLbl2','admLbl3'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=lbl;});renderSummary();renderDetailSelect();renderDetail();renderStaffManage();}
+
+function getMonthRecs(sid){var recs=S.records[sid]||{};return Object.entries(recs).filter(function(e){var d=new Date(e[0]);return d.getFullYear()===aY&&d.getMonth()===aM;});}
+
+function renderSummary(){
+  var people=new Set(),tDays=0,tMs=0,rows=[];
+  S.staff.forEach(function(s){var days=0,wms=0;getMonthRecs(s.id).forEach(function(e){var r=e[1];if(!r.in1&&!r.in)return;days++;tDays++;people.add(s.id);wms+=workMs(r);});tMs+=wms;if(days>0)rows.push({name:s.name,days:days,wms:wms,over:Math.max(0,wms-days*8*3600000)});});
+  document.getElementById('sPeople').textContent=people.size;document.getElementById('sTotal').textContent=fmtDur(tMs);document.getElementById('sDays').textContent=tDays;
+  var body=document.getElementById('repBody');
+  if(!rows.length){body.innerHTML='<div class="empty">この月のデータはありません</div>';return;}
+  body.innerHTML=rows.map(function(r){return '<div class="rep-row"><div class="rep-name">'+r.name+'</div><div class="rep-num acc">'+r.days+'日</div><div class="rep-num acc">'+fmtDur(r.wms)+'</div><div class="rep-num warn">'+fmtDur(r.over)+'</div></div>';}).join('');
+}
+
+function renderDetailSelect(){var sel=document.getElementById('detSel'),cur=sel.value;sel.innerHTML='<option value="">スタッフを選択</option>'+S.staff.map(function(s){return '<option value="'+s.id+'"'+(s.id===cur?' selected':'')+'>'+s.name+'</option>';}).join('');}
+
+function renderDetail(){
+  var sid=document.getElementById('detSel').value,tbl=document.getElementById('detTbl');
+  if(!sid){tbl.innerHTML='<div class="empty">スタッフを選択してください</div>';return;}
+  var entries=getMonthRecs(sid).sort(function(a,b){return b[0].localeCompare(a[0]);});
+  if(!entries.length){tbl.innerHTML='<div class="empty">記録がありません</div>';return;}
+  var dn=['日','月','火','水','木','金','土'];
+  var ss='width:100%;padding:4px 5px;border:1px solid var(--bdr);border-radius:5px;font-size:12px;font-family:monospace;background:var(--surf);color:var(--txt);outline:none;text-align:center;-webkit-appearance:none;appearance:none';
+  var html='<div class="det-row hdr" style="grid-template-columns:52px 1fr 1fr 1fr 1fr 60px 1fr"><div>日付</div><div>出勤1</div><div>退勤1</div><div>出勤2</div><div>退勤2</div><div style="text-align:right">勤務</div><div>メモ</div></div>';
+  entries.forEach(function(e){
+    var k=e[0],r=e[1],d=new Date(k);
+    var in1=r.in1||r.in,out1=r.out1||(!r.in2?r.out:null);
+    html+='<div class="det-row" style="grid-template-columns:52px 1fr 1fr 1fr 1fr 60px 1fr;align-items:start;padding:10px 14px">'
+      +'<div class="d-dt" style="padding-top:6px">'+(d.getMonth()+1)+'/'+d.getDate()+'('+dn[d.getDay()]+')</div>'
+      +'<div><select data-sid="'+sid+'" data-dk="'+k+'" data-field="in1" onchange="confirmEdit(this)" style="'+ss+'">'+makeOpts(in1?ft(in1):'',true)+'</select></div>'
+      +'<div><select data-sid="'+sid+'" data-dk="'+k+'" data-field="out1" onchange="confirmEdit(this)" style="'+ss+'">'+makeOpts(out1?ft(out1):'',true)+'</select></div>'
+      +'<div><select data-sid="'+sid+'" data-dk="'+k+'" data-field="in2" onchange="confirmEdit(this)" style="'+ss+'">'+makeOpts(r.in2?ft(r.in2):'',true)+'</select></div>'
+      +'<div><select data-sid="'+sid+'" data-dk="'+k+'" data-field="out2" onchange="confirmEdit(this)" style="'+ss+'">'+makeOpts(r.out2?ft(r.out2):'',true)+'</select></div>'
+      +'<div class="d-tot" style="padding-top:6px">'+fmtDur(workMs(r))+'</div>'
+      +'<div><input type="text" value="'+(r.memo||'')+'" data-sid="'+sid+'" data-dk="'+k+'" data-field="memo" onblur="confirmEditMemo(this)" style="width:100%;padding:4px 5px;border:1px solid var(--bdr);border-radius:5px;font-size:12px;background:var(--surf);color:var(--txt);outline:none"></div>'
+    +'</div>';
+  });
+  tbl.innerHTML=html;
+}
+
+function confirmEdit(el){
+  var sid=el.getAttribute('data-sid');
+  var dk=el.getAttribute('data-dk');
+  var field=el.getAttribute('data-field');
+  var val=el.value;
+  var d=new Date(dk);
+  var dn=['日','月','火','水','木','金','土'];
+  var dateStr=(d.getMonth()+1)+'/'+d.getDate()+'('+dn[d.getDay()]+')';
+  var fieldNames={in1:'出勤1',out1:'退勤1',in2:'出勤2',out2:'退勤2'};
+  var msg=dateStr+' の '+fieldNames[field]+' を「'+( val||'--:--')+'」に修正しますか？';
+  if(!confirm(msg)){
+    renderDetail();
+    return;
+  }
+  if(!S.records[sid])S.records[sid]={};
+  if(!S.records[sid][dk])S.records[sid][dk]={};
+  var r=S.records[sid][dk];
+  if(val===''){
+    r[field]=null;
+  } else {
+    r[field]=tsFromStr(dk,val);
+  }
+  r.in=r.in1||r.in;
+  r.out=r.out2||r.out1||null;
+  save();
+  renderDetail();
+  renderPunchScreen();
+  showToast(dateStr+' '+fieldNames[field]+' を修正しました ✓');
+}
+
+function confirmEditMemo(el){
+  var sid=el.getAttribute('data-sid');
+  var dk=el.getAttribute('data-dk');
+  var val=el.value.trim();
+  if(!S.records[sid]||!S.records[sid][dk])return;
+  var old=S.records[sid][dk].memo||'';
+  if(val===old)return;
+  var d=new Date(dk);
+  var dn=['日','月','火','水','木','金','土'];
+  var dateStr=(d.getMonth()+1)+'/'+d.getDate()+'('+dn[d.getDay()]+')';
+  if(!confirm(dateStr+' のメモを修正しますか？')){
+    el.value=old;
+    return;
+  }
+  S.records[sid][dk].memo=val;
+  save();
+  showToast(dateStr+' メモを修正しました ✓');
+}
+
+function renderStaffManage(){
+  var list=document.getElementById('smngList');
+  if(!S.staff.length){list.innerHTML='<div class="empty">スタッフがいません</div>';return;}
+  list.innerHTML=S.staff.map(function(s){return '<div class="smng-item"><div class="smng-av">'+s.name.charAt(0)+'</div><div class="smng-name">'+s.name+'</div><div style="display:flex;align-items:center;gap:4px;flex-shrink:0"><input type="number" value="'+(s.hourly||0)+'" min="0" onchange="setHourly(\''+s.id+'\',this.value)" style="width:72px;padding:4px 6px;border:1px solid var(--bdr);border-radius:6px;font-size:12px;text-align:right;background:var(--surf);color:var(--txt);outline:none"><span style="font-size:11px;color:var(--muted)">円</span></div><button class="delbtn" onclick="delStaff(\''+s.id+'\')">削除</button></div>';}).join('');
+}
+function setHourly(id,val){var s=S.staff.find(function(x){return x.id===id;});if(s){s.hourly=parseInt(val)||0;save();}}
+function setHourlyB(id,val){var s=S.staff.find(function(x){return x.id===id;});if(s){s.hourlyB=parseInt(val)||0;save();}}
+function addStaff(){var ni=document.getElementById('newName'),hi=document.getElementById('newHourly'),name=ni.value.trim();if(!name)return;S.staff.push({id:'s'+Date.now(),name:name,hourly:parseInt(hi.value)||0});ni.value='';hi.value='';save();renderStaffManage();showToast(name+' を追加しました');}
+function delStaff(id){var s=S.staff.find(function(x){return x.id===id;});if(!confirm(s.name+' を削除しますか？\n打刻記録も削除されます。'))return;S.staff=S.staff.filter(function(x){return x.id!==id;});delete S.records[id];save();renderStaffManage();showToast(s.name+' を削除しました');}
+
+function exportCSV(){
+  var rows=[['名前','日付','出勤1','退勤1','出勤2','退勤2','勤務時間(分)']];
+  S.staff.forEach(function(s){getMonthRecs(s.id).sort(function(a,b){return a[0].localeCompare(b[0]);}).forEach(function(e){var k=e[0],r=e[1],in1=r.in1||r.in;if(!in1)return;var out1=r.out1||(!r.in2?r.out:null);rows.push([s.name,k,ft(in1),ft(out1),ft(r.in2),ft(r.out2),Math.floor(workMs(r)/60000)]);});});
+  var csv=rows.map(function(r){return r.join(',');}).join('\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='timecard_'+aY+pad(aM+1)+'.csv';a.click();showToast('CSVをエクスポートしました ✓');
+}
+
+function renderPayslip(){
+  var lbl=document.getElementById('admLbl3');
+  if(lbl)lbl.textContent=aY+'年'+(aM+1)+'月';
+  var list=document.getElementById('payslipList');
+  if(!list)return;
+  if(!S.staff.length){list.innerHTML='<div class="empty">スタッフがいません</div>';return;}
+
+  var html='';
+  S.staff.forEach(function(s){
+    var entries=getMonthRecs(s.id).sort(function(a,b){return a[0].localeCompare(b[0]);});
+    if(!entries.length){
+      html+='<div class="payslip-card"><div class="ps-hdr"><div class="ps-name">'+s.name+'</div></div><div class="empty" style="padding:12px">この月の記録がありません</div></div>';
+      return;
+    }
+    var dn=['日','月','火','水','木','金','土'];
+    var rowsHtml='';
+    entries.forEach(function(e){
+      var k=e[0],r=e[1],d=new Date(k);
+      if(!r.in1&&!r.in)return;
+      var rate=r.rate||'A';
+      var aStyle='padding:4px 12px;border-radius:5px;border:none;font-weight:700;font-size:13px;cursor:pointer;'+(rate==='A'?'background:var(--acc);color:white':'background:var(--surf2);color:var(--muted)');
+      var bStyle='padding:4px 12px;border-radius:5px;border:none;font-weight:700;font-size:13px;cursor:pointer;'+(rate==='B'?'background:var(--warn);color:white':'background:var(--surf2);color:var(--muted)');
+      rowsHtml+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr)">'
+        +'<div style="font-family:monospace;font-size:12px;color:var(--muted);width:60px;flex-shrink:0">'+(d.getMonth()+1)+'/'+d.getDate()+'('+dn[d.getDay()]+')</div>'
+        +'<div style="font-size:12px;flex:1">'+ft(r.in1||r.in)+' 〜 '+ft(r.out1||r.out)+'</div>'
+        +'<div style="font-family:monospace;font-size:12px;color:var(--acc);width:44px;flex-shrink:0">'+fmtDur(workMs(r))+'</div>'
+        +'<div style="display:flex;gap:4px;flex-shrink:0">'
+          +'<button style="'+aStyle+'" data-sid="'+s.id+'" data-dk="'+k+'" data-rate="A" onclick="rateBtn(this)">A</button>'
+          +'<button style="'+bStyle+'" data-sid="'+s.id+'" data-dk="'+k+'" data-rate="B" onclick="rateBtn(this)">B</button>'
+        +'</div>'
+      +'</div>';
+    });
+    var pay=calcPayNum(s);
+    html+='<div class="payslip-card">'
+      +'<div class="ps-hdr"><div class="ps-name">'+s.name+'</div><div class="ps-wage">A: '+(s.hourly||0).toLocaleString()+'円　B: '+(s.hourlyB||0).toLocaleString()+'円</div></div>'
+      +'<div style="margin-bottom:10px">'+rowsHtml+'</div>'
+      +'<div style="text-align:right;font-weight:700;font-size:15px;color:var(--dng);margin-bottom:10px">合計支給額: '+pay.toLocaleString()+'円</div>'
+      +'<button class="print-btn" data-sid="'+s.id+'" onclick="printSlipById(this)">🖨 印刷</button>'
+    +'</div>';
+  });
+  list.innerHTML=html;
+}
+
+function rateBtn(el){
+  var sid=el.getAttribute('data-sid'),dk=el.getAttribute('data-dk'),rate=el.getAttribute('data-rate');
+  if(!S.records[sid])S.records[sid]={};
+  if(!S.records[sid][dk])S.records[sid][dk]={};
+  S.records[sid][dk].rate=rate;
+  save();renderPayslip();
+}
+
+function printSlipById(el){
+  printSlip(el.getAttribute('data-sid'));
+}
+
+function calcPayNum(s){
+  var entries=getMonthRecs(s.id),pay=0;
+  entries.forEach(function(e){var r=e[1];if(r.in1||r.in){var rh=(r.rate==='B')?(s.hourlyB||0):(s.hourly||0);pay+=Math.floor((workMs(r)/3600000)*rh);}});
+  return pay;
+}
+
+function calcPay(s){
+  var entries=getMonthRecs(s.id),pay=0;
+  entries.forEach(function(e){var r=e[1];if(r.in1||r.in){var rh=(r.rate==='B')?(s.hourlyB||0):(s.hourly||0);pay+=Math.floor((workMs(r)/3600000)*rh);}});
+  return pay.toLocaleString();
+}
+
+function setDayRate(sid,dateKey,rate){
+  if(!S.records[sid])S.records[sid]={};
+  if(!S.records[sid][dateKey])S.records[sid][dateKey]={};
+  S.records[sid][dateKey].rate=rate;
+  save();renderPayslip();
+}
+
+function printSlip(sid){
+  var s=S.staff.find(function(x){return x.id===sid;});if(!s)return;
+  var entries=getMonthRecs(sid).sort(function(a,b){return a[0].localeCompare(b[0]);});
+  var days=0,totalMs=0;
+  entries.forEach(function(e){var r=e[1];if(r.in1||r.in){days++;totalMs+=workMs(r);}});
+  var pay=calcPayNum(s);
+  var dn=['日','月','火','水','木','金','土'];
+  var rowsHtml='';
+  entries.forEach(function(e){
+    var k=e[0],r=e[1],d=new Date(k);
+    if(!r.in1&&!r.in)return;
+    var in1=r.in1||r.in,out1=r.out1||(!r.in2?r.out:null),wm=workMs(r);
+    var wh=Math.floor(wm/3600000),wmin=Math.floor((wm%3600000)/60000);
+    var rateH=(r.rate==='B')?(s.hourlyB||0):(s.hourly||0);
+    var rp=Math.floor((wm/3600000)*rateH);
+    rowsHtml+='<tr><td>'+(d.getMonth()+1)+'/'+d.getDate()+'('+dn[d.getDay()]+')</td><td>'+ft(in1)+'</td><td>'+ft(out1)+'</td>'
+      +(r.in2?'<td>'+ft(r.in2)+'</td><td>'+ft(r.out2)+'</td>':'<td>-</td><td>-</td>')
+      +'<td>'+(r.rate||'A')+'</td><td>'+wh+'h'+pad(wmin)+'m</td><td>'+rp.toLocaleString()+'</td><td style="text-align:left;font-size:7.5px;color:#666">'+(r.memo||'')+'</td></tr>';
+  });
+  var wh2=Math.floor(totalMs/3600000),wm2=Math.floor((totalMs%3600000)/60000);
+  var p=[];
+  p.push('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">');
+  p.push('<meta name="viewport" content="width=device-width,initial-scale=1">');
+  p.push('<title>給与明細</title><style>');
+  p.push('@page{size:A4 portrait;margin:8mm;}');
+  p.push('*{box-sizing:border-box;}');
+  p.push('body{font-family:sans-serif;font-size:9px;margin:0;padding:0;color:#222;}');
+  p.push('.hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #333;padding-bottom:5px;margin-bottom:8px;}');
+  p.push('.hdr h1{font-size:14px;margin:0;}.hdr-sub{font-size:9px;color:#666;text-align:right;}');
+  p.push('.info{display:flex;gap:16px;margin-bottom:8px;align-items:flex-end;}');
+  p.push('.nm{font-size:13px;font-weight:700;}.wg{font-size:9px;color:#666;}');
+  p.push('.sg{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;}');
+  p.push('.sc{border:1px solid #ccc;border-radius:4px;padding:5px;text-align:center;}');
+  p.push('.sl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px;}');
+  p.push('.sv{font-size:13px;font-weight:700;}.sv.pay{color:#c0392b;font-size:15px;}');
+  p.push('table{width:100%;border-collapse:collapse;font-size:8.5px;}');
+  p.push('th{background:#f0ead8;padding:3px 4px;text-align:center;border:0.5px solid #bbb;font-weight:700;}');
+  p.push('td{padding:2.5px 4px;border:0.5px solid #ddd;text-align:center;}');
+  p.push('td:last-child{text-align:right;}');
+  p.push('.footer{font-size:8px;color:#999;text-align:center;margin-top:6px;border-top:0.5px solid #eee;padding-top:4px;}');
+  p.push('.pbtn{display:block;width:100%;padding:10px;background:#4a7c3f;color:white;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;}');
+  p.push('@media print{.pbtn{display:none!important;}body{font-size:8px;}}');
+
+  p.push('<div class="hdr"><h1>給与明細</h1><div class="hdr-sub"><div>高井農園</div><div>'+aY+'年'+(aM+1)+'月分</div></div></div>');
+  p.push('<div class="info"><div><div class="nm">'+s.name+'</div><div class="wg">時給A: '+(s.hourly||0).toLocaleString()+'円　時給B: '+(s.hourlyB||0).toLocaleString()+'円</div></div></div>');
+  p.push('<div class="sg">');
+  p.push('<div class="sc"><div class="sl">出勤日数</div><div class="sv">'+days+'日</div></div>');
+  p.push('<div class="sc"><div class="sl">勤務時間</div><div class="sv">'+wh2+'h'+pad(wm2)+'m</div></div>');
+  p.push('<div class="sc"><div class="sl">支給額</div><div class="sv pay">'+pay.toLocaleString()+'円</div></div>');
+  p.push('</div>');
+  p.push('<table><tr><th>日付</th><th>出勤1</th><th>退勤1</th><th>出勤2</th><th>退勤2</th><th>区分</th><th>勤務時間</th><th>金額(円)</th><th>メモ</th></tr>');
+  p.push(rowsHtml);
+  p.push('</table>');
+  p.push('<div class="footer">高井農園 / 印刷日: '+new Date().toLocaleDateString('ja-JP')+'</div>');
+
+  p.push('</div>');
+  document.getElementById('printContent').innerHTML = p.join('');
+  document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('printScreen').style.display = 'block';
+  window.scrollTo(0,0);
+}
+
+function closePrint(){
+  document.getElementById('printScreen').style.display = 'none';
+  document.getElementById('adminScreen').style.display = 'flex';
+}
+
+function openMr(sid){mrId=sid;mrY=new Date().getFullYear();mrM=new Date().getMonth();var s=S.staff.find(function(x){return x.id===sid;});document.getElementById('mrTitle').textContent=s.name+' の記録';document.getElementById('mrScreen').classList.add('open');renderMr();}
+function handleMrOverlay(e){if(e.target===document.getElementById('mrScreen'))closeMr();}
+function closeMr(){document.getElementById('mrScreen').classList.remove('open');}
+function changeMrMonth(dir){mrM+=dir;if(mrM<0){mrM=11;mrY--;}if(mrM>11){mrM=0;mrY++;}renderMr();}
+function renderMr(){
+  document.getElementById('mrMonthLbl').textContent=mrY+'年'+(mrM+1)+'月';
+  var recs=S.records[mrId]||{};
+  var entries=Object.entries(recs).filter(function(e){var d=new Date(e[0]);return d.getFullYear()===mrY&&d.getMonth()===mrM;}).sort(function(a,b){return b[0].localeCompare(a[0]);});
+  var days=0,total=0;entries.forEach(function(e){var r=e[1];if(r.in1||r.in){days++;total+=workMs(r);}});
+  document.getElementById('mrDays').textContent=days+'日';document.getElementById('mrTotal').textContent=fmtDur(total);
+  var tbl=document.getElementById('mrTbl');
+  if(!entries.length){tbl.innerHTML='<div class="empty">記録がありません</div>';return;}
+  var dn=['日','月','火','水','木','金','土'];
+  tbl.innerHTML='<div class="mr-row hdr"><div>日付</div><div>出勤</div><div>退勤</div><div style="text-align:right">勤務</div></div>'+entries.map(function(e){var k=e[0],r=e[1],d=new Date(k),in1=r.in1||r.in,out1=r.out1||(!r.in2?r.out:null);return '<div class="mr-row"><div class="mr-dt">'+(d.getMonth()+1)+'/'+d.getDate()+'('+dn[d.getDay()]+')</div><div class="mr-in">'+ft(in1)+'</div><div class="mr-out">'+ft(out1)+'</div><div class="mr-tot">'+fmtDur(workMs(r))+'</div></div>';}).join('');
+}
+
+function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2500);}
+
+updateClock();setInterval(updateClock,1000);renderPunchScreen();
+</script>
+</body>
+</html>
