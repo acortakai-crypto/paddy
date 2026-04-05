@@ -1009,10 +1009,13 @@ function flashMeasureBtn(msg) {
 // ════════════════════════════════════════════════
 function resizeCanvas() {
   const wrap = canvas.parentElement;
-  // getBoundingClientRectで実際の表示サイズを取得（スクロールやズームに影響されない）
   const rect = wrap.getBoundingClientRect();
-  canvas.width  = Math.floor(rect.width)  || wrap.clientWidth;
-  canvas.height = Math.floor(rect.height) || wrap.clientHeight;
+  // 実際に表示されているサイズをそのまま使う
+  // getBoundingClientRectが0の場合はclientWidth/Heightで代替
+  const w = Math.floor(rect.width)  || wrap.clientWidth  || 300;
+  const h = Math.floor(rect.height) || wrap.clientHeight || 300;
+  canvas.width  = w;
+  canvas.height = h;
 }
 
 window.addEventListener('resize', () => { resizeCanvas(); drawHeatmap(); });
@@ -1020,7 +1023,10 @@ resizeCanvas();
 
 function drawHeatmap() {
   if (!currentField) return;
-  resizeCanvas();
+  // canvasを実際に表示されているサイズに強制セット
+  const wrap = canvas.parentElement;
+  canvas.width  = wrap.clientWidth  || 300;
+  canvas.height = wrap.clientHeight || 300;
   const { gridX, gridY, points } = currentField;
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
@@ -1216,7 +1222,7 @@ function drawEmptyGrid(gx, gy, W, H) {
   const maxDotR = Math.min(
     Math.floor(W / (gx * 2 + 2)),
     Math.floor(H / (gy * 2 + 2)),
-    12
+    10
   );
   const dotRadius = Math.max(maxDotR, 4);
   const padX = dotRadius + 14;
