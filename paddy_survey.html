@@ -1009,8 +1009,11 @@ function flashMeasureBtn(msg) {
 //  HEATMAP RENDERER
 // ════════════════════════════════════════════════
 function resizeCanvas() {
-  canvas.width  = Math.max(window.innerWidth  - 200 - 220, 100);
-  canvas.height = Math.max(window.innerHeight - 36, 100);
+  // visualViewportで実際の表示幅を取得（ズーム・DPR対応）
+  const vw = window.visualViewport ? window.visualViewport.width  : window.innerWidth;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  canvas.width  = Math.max(Math.round(vw) - 200 - 220, 100);
+  canvas.height = Math.max(Math.round(vh) - 36, 100);
 }
 
 window.addEventListener('resize', () => { resizeCanvas(); drawHeatmap(); });
@@ -1018,19 +1021,19 @@ resizeCanvas();
 
 function drawHeatmap() {
   if (!currentField) return;
-  canvas.width  = Math.max(window.innerWidth  - 200 - 220, 100);
-  canvas.height = Math.max(window.innerHeight - 36, 100);
+  // visualViewportで実際の表示幅を取得
+  const vw = window.visualViewport ? window.visualViewport.width  : window.innerWidth;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  canvas.width  = Math.max(Math.round(vw) - 200 - 220, 100);
+  canvas.height = Math.max(Math.round(vh) - 36, 100);
   const { gridX, gridY, points } = currentField;
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-  // デバッグ: 画面左上にサイズ表示
-  ctx.fillStyle='rgba(0,0,0,0.7)';
-  ctx.fillRect(0,0,260,18);
-  ctx.fillStyle='#00ff00';
-  ctx.font='11px monospace';
-  ctx.textAlign='left';
-  ctx.textBaseline='top';
-  ctx.fillText('W:'+W+' H:'+H+' gx:'+gridX+' gy:'+gridY+' win:'+window.innerWidth+'x'+window.innerHeight, 4, 3);
+  // デバッグ表示（確認後削除）
+  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,300,18);
+  ctx.fillStyle='#00ff00';ctx.font='11px monospace';
+  ctx.textAlign='left';ctx.textBaseline='top';
+  ctx.fillText('W:'+W+' H:'+H+' vw:'+Math.round(vw)+'x'+Math.round(vh), 4, 3);
 
   if (!points || points.length === 0) {
     // Empty grid guide
