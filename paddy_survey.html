@@ -1071,11 +1071,9 @@ function drawHeatmap() {
   document.getElementById('legHi').textContent = (hiCm >= 0 ? '+' : '') + hiCm.toFixed(1) + ' cm';
   document.getElementById('legLo').textContent = (loCm >= 0 ? '+' : '') + loCm.toFixed(1) + ' cm';
 
-  // Padding: グリッドが全部収まるよう動的計算
-  const minPad = 18;
-  const dotR = 7; // 格子点の半径
-  const padX = Math.max(minPad, dotR + 2);
-  const padY = Math.max(minPad, dotR + 2);
+  // Padding: 格子点(半径12px)＋ラベル(14px)が確実に収まる値
+  const padX = 26;
+  const padY = 26;
   const plotW = W - padX * 2;
   const plotH = H - padY * 2;
 
@@ -1206,8 +1204,8 @@ function drawHeatmap() {
 }
 
 function drawEmptyGrid(gx, gy, W, H) {
-  const padX = Math.max(18, 9);
-  const padY = Math.max(18, 9);
+  const padX = 26;
+  const padY = 26;
   const plotW = W - padX * 2, plotH = H - padY * 2;
 
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
