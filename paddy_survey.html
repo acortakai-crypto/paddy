@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Permissions-Policy" content="geolocation=*">
 <title>圃場高低差測定</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
@@ -198,11 +199,13 @@ html, body {
   font-family: var(--mono);
   font-size: 8px;
   color: var(--txt2);
-  height: 30px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  min-height: 30px;
+  max-height: 60px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
   margin-top: 5px;
+  line-height: 1.5;
 }
 
 /* ── Center ref display ── */
@@ -491,7 +494,10 @@ html, body {
         <div class="center-ref-val" id="centerAltDisplay">未記録</div>
         <button class="btn red" id="btnResetCenter" style="padding:4px 7px;font-size:9px">リセット</button>
       </div>
-      <button class="measure-btn" id="btnMeasure" disabled>🎯 センター基準点を記録</button>
+      <button class="measure-btn" id="btnMeasure" disabled>🎯 ここを基準点に設定</button>
+      <div style="font-size:8px;color:var(--txt2);margin-top:5px;line-height:1.5" id="autoRecordStatus">
+        基準点設定後は走行するだけで自動記録
+      </div>
     </div>
 
     <!-- フィールド名 -->
@@ -632,8 +638,10 @@ function onGpsConnectSuccess(pos) {
   }
 
   updateGPSUI();
+  tryAutoRecord();  // 自動記録トリガー
   const altStr = gpsData.alt != null ? gpsData.alt.toFixed(3) + 'm' : '--';
-  logNMEA('lat:' + co.latitude.toFixed(7) + ' alt:' + altStr + ' acc:' + (co.accuracy != null ? co.accuracy.toFixed(3) : '--') + 'm');
+  const accStr = co.accuracy != null ? co.accuracy.toFixed(3) + 'm' : '--';
+  logNMEA('lat:' + co.latitude.toFixed(7) + '\nalt:' + altStr + ' acc:' + accStr);
 }
 
 function onGpsConnectError(err) {
@@ -844,6 +852,7 @@ function renderFieldList() {
 }
 
 function selectField(id) {
+  autoRecording = false;  // 圃場切替時は自動記録停止
   currentField = db.fields.find(f => f.id === id);
   if (!currentField) return;
   renderFieldList();
@@ -851,6 +860,19 @@ function selectField(id) {
   document.getElementById('mainTitle').textContent = currentField.name + (currentField.note ? ' — ' + currentField.note : '');
   updateMeasureLabel();
   drawHeatmap();
+  // 自動記録ステータス表示リセット
+  const status = document.getElementById('autoRecordStatus');
+  if (status) {
+    if (currentField.centerAlt != null) {
+      const done = (currentField.points||[]).filter(p=>!p.extra).length;
+      const total = currentField.gridX * currentField.gridY;
+      status.textContent = done >= total ? '✅ 記録完了 — 基準点を再設定で再開' : '⏸ 一時停止 — 基準点を設定で再開';
+      status.style.color = done >= total ? 'var(--grn)' : 'var(--txt2)';
+    } else {
+      status.textContent = '基準点設定後は走行するだけで自動記録';
+      status.style.color = 'var(--txt2)';
+    }
+  }
 }
 
 function showGuide(v) {
@@ -863,39 +885,89 @@ function showGuide(v) {
 // ════════════════════════════════════════════════
 //  MEASURE  -- センター1点基準モード
 // ════════════════════════════════════════════════
+// ── 自動記録の状態管理 ──
+let autoRecording = false;
+let lastAutoRecordTime = 0;
+const AUTO_RECORD_INTERVAL = 2000; // 2秒ごとに最大1回記録
+
 document.getElementById('btnMeasure').onclick = () => {
   if (!currentField) { alert('圃場を選択してください'); return; }
-  if (gpsData.alt == null) { alert('GPS高度データがありません'); return; }
+  if (gpsData.alt == null) { alert('GPS高度データがありません\nDGのRTK接続を確認してください'); return; }
 
-  // センター基準点が未記録なら最初に記録
-  if (currentField.centerAlt == null) {
-    currentField.centerAlt = gpsData.alt;
-    currentField.points = [];
-    saveDB(); drawHeatmap(); renderFieldList();
-    flashMeasureBtn('🎯 基準点を記録しました');
-    updateMeasureLabel();
+  // センター基準点を記録してから自動記録開始
+  currentField.centerAlt = gpsData.alt;
+  currentField.points = [];
+  autoRecording = true;
+  saveDB(); drawHeatmap(); renderFieldList();
+  updateMeasureLabel();
+
+  const status = document.getElementById('autoRecordStatus');
+  if (status) {
+    status.textContent = '🟢 自動記録中 — 走行するだけで記録されます';
+    status.style.color = 'var(--acc)';
+  }
+  flashMeasureBtn('✓ 基準点設定 — 自動記録開始');
+};
+
+// 自動記録: GPS更新のたびに呼ばれる
+function tryAutoRecord() {
+  if (!autoRecording) return;
+  if (!currentField) return;
+  if (currentField.centerAlt == null) return;
+  if (gpsData.lat == null || gpsData.alt == null) return;
+
+  const now = Date.now();
+  if (now - lastAutoRecordTime < AUTO_RECORD_INTERVAL) return;
+  lastAutoRecordTime = now;
+
+  // 現在位置から最近接の未記録格子点を探す
+  const gx = currentField.gridX, gy = currentField.gridY;
+  const taken = new Set(currentField.points.filter(p=>!p.extra).map(p => p.row + '_' + p.col));
+
+  // 格子点が全部記録済みなら自動更新（既存点を現在値で上書き）
+  const allTaken = taken.size >= gx * gy;
+  if (allTaken) {
+    // 全点記録済み: 最も近い格子点を上書き更新
+    let bestIdx = -1, bestDist = Infinity;
+    currentField.points.forEach((p, i) => {
+      if (p.extra) return;
+      const dist = Math.sqrt((p.lat - gpsData.lat)**2 + (p.lon - gpsData.lon)**2);
+      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+    });
+    if (bestIdx >= 0) {
+      currentField.points[bestIdx].alt = gpsData.alt;
+      currentField.points[bestIdx].lat = gpsData.lat;
+      currentField.points[bestIdx].lon = gpsData.lon;
+    }
+    saveDB(); drawHeatmap();
     return;
   }
 
-  // 各格子点を記録
-  const gx = currentField.gridX, gy = currentField.gridY;
-  const taken = new Set(currentField.points.map(p => p.row + '_' + p.col));
-  let target = null;
-  outer: for (let r = 0; r < gy; r++) {
-    for (let c = 0; c < gx; c++) {
-      if (!taken.has(r + '_' + c)) { target = { row: r, col: c }; break outer; }
+  // 未記録の格子点に順番に記録
+  for (let r = 0; r < gy; r++) {
+    for (let col2 = 0; col2 < gx; col2++) {
+      if (!taken.has(r + '_' + col2)) {
+        currentField.points.push({
+          row: r, col: col2,
+          alt: gpsData.alt,
+          lat: gpsData.lat, lon: gpsData.lon
+        });
+        saveDB(); drawHeatmap(); renderFieldList();
+
+        const status = document.getElementById('autoRecordStatus');
+        const done = currentField.points.filter(p=>!p.extra).length;
+        const total = gx * gy;
+        if (status) {
+          status.textContent = '🟢 自動記録中 ' + done + '/' + total + '点';
+          if (done >= total) {
+            status.textContent = '✅ 全格子点記録完了 — 走行で更新中';
+            status.style.color = 'var(--grn)';
+          }
+        }
+        return;
+      }
     }
   }
-
-  if (!target) {
-    if (!confirm('すべての格子点が記録済みです。この地点を追加記録しますか？')) return;
-    currentField.points.push({ row: -1, col: -1, alt: gpsData.alt, extra: true, lat: gpsData.lat, lon: gpsData.lon });
-  } else {
-    currentField.points.push({ row: target.row, col: target.col, alt: gpsData.alt, lat: gpsData.lat, lon: gpsData.lon });
-  }
-
-  saveDB(); drawHeatmap(); renderFieldList();
-  flashMeasureBtn();
 };
 
 document.getElementById('btnResetCenter').onclick = () => {
@@ -911,11 +983,11 @@ function updateMeasureLabel() {
   const btn = document.getElementById('btnMeasure');
   if (!currentField) return;
   if (currentField.centerAlt == null) {
-    btn.textContent = '🎯 センター基準点を記録';
+    btn.textContent = '🎯 ここを基準点に設定';
     btn.style.background = 'linear-gradient(135deg,#ffaa00,#ff6600)';
   } else {
-    btn.textContent = '📍 この地点を記録';
-    btn.style.background = '';
+    btn.textContent = '🔄 基準点を再設定';
+    btn.style.background = 'linear-gradient(135deg,#555,#333)';
   }
 }
 
@@ -999,8 +1071,11 @@ function drawHeatmap() {
   document.getElementById('legHi').textContent = (hiCm >= 0 ? '+' : '') + hiCm.toFixed(1) + ' cm';
   document.getElementById('legLo').textContent = (loCm >= 0 ? '+' : '') + loCm.toFixed(1) + ' cm';
 
-  // Padding
-  const padX = 40, padY = 40;
+  // Padding: グリッドが全部収まるよう動的計算
+  const minPad = 18;
+  const dotR = 7; // 格子点の半径
+  const padX = Math.max(minPad, dotR + 2);
+  const padY = Math.max(minPad, dotR + 2);
   const plotW = W - padX * 2;
   const plotH = H - padY * 2;
 
@@ -1131,7 +1206,8 @@ function drawHeatmap() {
 }
 
 function drawEmptyGrid(gx, gy, W, H) {
-  const padX = 40, padY = 40;
+  const padX = Math.max(18, 9);
+  const padY = Math.max(18, 9);
   const plotW = W - padX * 2, plotH = H - padY * 2;
 
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -1161,7 +1237,7 @@ function drawEmptyGrid(gx, gy, W, H) {
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '12px Noto Sans JP, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('GPS接続後「この地点を記録」で順番に測定してください', W / 2, H / 2 + 20);
+  ctx.fillText('GPS接続してから基準点を設定 → 走行で自動記録', W / 2, H / 2 + 20);
 }
 
 // IDW (Inverse Distance Weighting)
