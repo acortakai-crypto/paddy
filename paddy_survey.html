@@ -422,6 +422,12 @@ html, body {
 
     <!-- 接続 -->
     <div class="ps">
+      <div class="ps-label">エリア選択</div>
+      <div class="btn-row" id="areaBtns" style="margin-bottom:6px">
+        <button class="btn" id="areaBtn0" onclick="switchArea('白根')">白根</button>
+        <button class="btn" id="areaBtn1" onclick="switchArea('潟東')">潟東</button>
+        <button class="btn" id="areaBtn2" onclick="switchArea('金巻')">金巻</button>
+      </div>
       <div class="ps-label">DG-PRO1RWS <span id="fieldCount" style="color:var(--acc)">0</span>圃場</div>
       <div class="btn-row" style="margin-bottom:5px">
         <button class="btn acc" id="btnConnect">GPS接続</button>
@@ -526,346 +532,184 @@ html, body {
 </div>
 
 <script>
-// ════════════════════════════════════════════════
-//  STATE
-// ════════════════════════════════════════════════
-const DB_KEY = 'paddy_survey_v2';
-let db = loadDB();
 
-let currentField = null;
+// ════════════════════════════════════════════
+//  DB (localStorage)
+// ════════════════════════════════════════════
+const AREAS = ['白根', '潟東', '金巻'];
+let currentArea = AREAS[0];
+let db = { '白根':{fields:[]}, '潟東':{fields:[]}, '金巻':{fields:[]} };
 
-// GPS state
-let gpsData = { alt: null, hdop: null, sats: 0, fix: 0, lat: null, lon: null };
-let nmeaBuffer = '';
-
-// canvas
-const canvas = document.getElementById('heatmap');
-const ctx = canvas.getContext('2d');
-
-// ════════════════════════════════════════════════
-//  PERSISTENCE
-// ════════════════════════════════════════════════
 function loadDB() {
-  try { return JSON.parse(localStorage.getItem(DB_KEY)) || { fields: [] }; }
-  catch { return { fields: [] }; }
+  try {
+    const saved = JSON.parse(localStorage.getItem('paddyDB_v2') || 'null');
+    if (saved && saved['白根']) {
+      db = saved;
+    } else {
+      // 旧データがあれば白根に移行
+      const old = JSON.parse(localStorage.getItem('paddyDB') || '{"fields":[]}');
+      db['白根'].fields = old.fields || [];
+    }
+  } catch(e) { db = { '白根':{fields:[]}, '潟東':{fields:[]}, '金巻':{fields:[]} }; }
 }
 function saveDB() {
-  try {
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-  } catch(e) {
-    console.warn('保存失敗 (容量超過の可能性):', e);
-    alert('データの保存に失敗しました。\nストレージ容量を確認してください。');
-  }
+  try { localStorage.setItem('paddyDB_v2', JSON.stringify(db)); } catch(e) {}
 }
+function areaFields() { return db[currentArea].fields; }
+loadDB();
 
-// ════════════════════════════════════════════════
-//  起動時チェック: file://で開いている場合に警告
-// ════════════════════════════════════════════════
-window.addEventListener('load', () => {
-  if (location.protocol === 'file:') {
-    const el = document.getElementById('nmeaLog');
-    if (el) el.textContent = '⚠ file://では動きません。Googleドライブ経由で開いてください。';
-  }
-});
-
-// ════════════════════════════════════════════════
-//  Geolocation API 接続
-//  Drogger-GPSのモックプロバイダー機能を使い、
-//  Android内蔵GPSをDG-PRO1RWSの高精度値に置き換える。
-//  ChromeのnavigatorgeolocationでそのままRTKデータを受け取れる。
-//
-//  必要なもの: Drogger-GPSのみ（AvNav不要）
-//  Drogger-GPS設定: モックプロバイダーをONにする
-// ════════════════════════════════════════════════
-let geoConnectWatchId = null;
+// ════════════════════════════════════════════
+//  GPS
+// ════════════════════════════════════════════
+let geoWatchId = null;
+let gpsData = { lat:null, lon:null, alt:null, accuracy:null };
 
 document.getElementById('btnConnect').onclick = () => {
-  startGpsConnect();
+  if (!navigator.geolocation) { alert('Geolocation未対応です'); return; }
+  if (location.protocol === 'file:') {
+    document.getElementById('nmeaLog').textContent = '⚠ file://では動きません。GitHub Pages経由で開いてください。';
+    return;
+  }
+  logNMEA('GPS接続中...');
+  geoWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      gpsData.lat      = pos.coords.latitude;
+      gpsData.lon      = pos.coords.longitude;
+      gpsData.alt      = pos.coords.altitude;
+      gpsData.accuracy = pos.coords.accuracy;
+      setConnected(true);
+      const alt = gpsData.alt != null ? gpsData.alt.toFixed(3)+'m' : '--';
+      const acc = gpsData.accuracy != null ? gpsData.accuracy.toFixed(3)+'m' : '--';
+      logNMEA('lat:'+gpsData.lat.toFixed(7)+'\nalt:'+alt+' acc:'+acc);
+      document.getElementById('gpsAlt').textContent  = gpsData.alt  != null ? gpsData.alt.toFixed(3)  : '—';
+      document.getElementById('gpsSat').textContent  = '—';
+      document.getElementById('gpsHdop').textContent = '—';
+      document.getElementById('gpsFix').textContent  = gpsData.accuracy != null && gpsData.accuracy < 0.1 ? 'RTK' : 'GPS';
+      document.getElementById('gpsFix').style.color  = gpsData.accuracy != null && gpsData.accuracy < 0.1 ? '#00ff88' : '#ffaa00';
+      tryAutoRecord();
+    },
+    err => {
+      let msg = '';
+      if (err.code === 1) { msg = '位置情報の許可が必要です'; alert(msg); }
+      else if (err.code === 2) msg = 'GPS信号なし。Drogger-GPSの接続を確認。';
+      else if (err.code === 3) msg = 'タイムアウト。屋外で試してください。';
+      else msg = 'エラー: ' + err.message;
+      logNMEA(msg); setConnected(false);
+    },
+    { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
+  );
 };
 
 document.getElementById('btnDisconnect').onclick = () => {
-  stopGpsConnect();
-  setConnected(false);
-  logNMEA('切断しました');
+  if (geoWatchId != null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; }
+  setConnected(false); logNMEA('切断しました');
 };
-
-function startGpsConnect() {
-  if (!navigator.geolocation) {
-    alert('Geolocation API未対応です。Android版Chromeをお使いください。');
-    return;
-  }
-  stopGpsConnect();
-  logNMEA('GPS接続中...');
-
-  geoConnectWatchId = navigator.geolocation.watchPosition(
-    onGpsConnectSuccess,
-    onGpsConnectError,
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    }
-  );
-}
-
-function stopGpsConnect() {
-  if (geoConnectWatchId !== null) {
-    navigator.geolocation.clearWatch(geoConnectWatchId);
-    geoConnectWatchId = null;
-  }
-}
-
-function onGpsConnectSuccess(pos) {
-  const co = pos.coords;
-  setConnected(true);
-
-  gpsData.lat = co.latitude;
-  gpsData.lon = co.longitude;
-  if (co.altitude != null) gpsData.alt = co.altitude;
-  if (co.accuracy != null) gpsData.hdop = Math.round(co.accuracy * 10) / 10;
-
-  // accuracyからfix品質を推定
-  if (co.accuracy != null && co.accuracy < 0.05) {
-    gpsData.fix = 4; // RTK fixed
-  } else if (co.accuracy != null && co.accuracy < 0.3) {
-    gpsData.fix = 5; // RTK float
-  } else if (co.latitude != null) {
-    gpsData.fix = 3; // 3D fix
-  } else {
-    gpsData.fix = 0;
-  }
-
-  updateGPSUI();
-  tryAutoRecord();  // 自動記録トリガー
-  const altStr = gpsData.alt != null ? gpsData.alt.toFixed(3) + 'm' : '--';
-  const accStr = co.accuracy != null ? co.accuracy.toFixed(3) + 'm' : '--';
-  logNMEA('lat:' + co.latitude.toFixed(7) + '\nalt:' + altStr + ' acc:' + accStr);
-}
-
-function onGpsConnectError(err) {
-  let msg = '';
-  if (err.code === 1) {
-    msg = '位置情報の許可が必要です';
-    // file://で開いている場合の案内
-    if (location.protocol === 'file:') {
-      alert('このファイルをfile://で開いているため\n位置情報が使えません。\n\nGoogleドライブにアップロードして\n「共有リンク」でChromeから開いてください。');
-    } else {
-      alert('位置情報の許可が必要です。\nChrome設定→サイトの設定→位置情報→許可してください。');
-    }
-  }
-  else if (err.code === 2) msg = 'GPS信号なし。Drogger-GPSが起動しDGと接続されているか確認。';
-  else if (err.code === 3) msg = 'タイムアウト。屋外でDGのアンテナが空に向いているか確認。';
-  else msg = 'エラー: ' + err.message;
-  logNMEA(msg);
-  setConnected(false);
-}
 
 function setConnected(v) {
-  const dot = document.getElementById('connDot');
-  document.getElementById('btnConnect').disabled = v;
+  document.getElementById('connDot').className = 'conn-dot' + (v ? ' on' : '');
+  document.getElementById('btnConnect').disabled    = v;
   document.getElementById('btnDisconnect').disabled = !v;
-  document.getElementById('btnMeasure').disabled = !v;
-  dot.className = 'conn-dot' + (v ? ' on' : '');
+  document.getElementById('btnMeasure').disabled    = !v;
 }
 
-// ════════════════════════════════════════════════
-//  NMEA PARSER
-// ════════════════════════════════════════════════
-function parseNMEA(raw) {
-  logNMEA(raw);
-  if (!raw.startsWith('$')) return;
-  const parts = raw.split(',');
-  const type = parts[0].slice(1);  // e.g. GPGGA
-
-  if (type.endsWith('GGA')) {
-    // $..GGA,time,lat,NS,lon,EW,fix,sats,hdop,alt,M,...
-    const fix = parseInt(parts[6]) || 0;
-    const sats = parseInt(parts[7]) || 0;
-    const hdop = parseFloat(parts[8]) || 0;
-    const alt  = parseFloat(parts[9]);
-    gpsData.fix  = fix;
-    gpsData.sats = sats;
-    gpsData.hdop = hdop;
-    if (!isNaN(alt)) gpsData.alt = alt;
-    updateGPSUI();
-  }
-  if (type.endsWith('RMC')) {
-    // lat/lon
-    const lat  = nmeaToDecimal(parts[3], parts[4]);
-    const lon  = nmeaToDecimal(parts[5], parts[6]);
-    if (lat != null) { gpsData.lat = lat; gpsData.lon = lon; }
-  }
-}
-
-function nmeaToDecimal(raw, dir) {
-  if (!raw || raw.length < 4) return null;
-  const dot = raw.indexOf('.');
-  if (dot < 3) return null;
-  const deg = parseInt(raw.slice(0, dot - 2));
-  const min = parseFloat(raw.slice(dot - 2));
-  if (isNaN(deg) || isNaN(min)) return null;
-  let d = deg + min / 60;
-  if (dir === 'S' || dir === 'W') d = -d;
-  return d;
-}
-
-function logNMEA(line) {
+function logNMEA(msg) {
   const el = document.getElementById('nmeaLog');
-  el.textContent = line;
+  if (el) el.textContent = msg;
 }
 
-function updateGPSUI() {
-  document.getElementById('gpsAlt').textContent  = gpsData.alt != null ? gpsData.alt.toFixed(3) + ' m' : '—';
-  document.getElementById('gpsHdop').textContent = gpsData.hdop != null ? gpsData.hdop.toFixed(2) : '—';
-  document.getElementById('gpsSat').textContent  = gpsData.sats || '—';
-  document.getElementById('gpsFix').textContent  = ['無効','GPS','DGPS','PPS','RTK','Float'][gpsData.fix] || gpsData.fix;
+// ════════════════════════════════════════════
+//  圃場管理
+// ════════════════════════════════════════════
+let currentField = null;
+
+function switchArea(area) {
+  currentArea = area;
+  currentField = null;
+  showGuide(true);
+  renderFieldList();
+  drawHeatmap();
+  // ボタンのハイライト更新
+  AREAS.forEach((a,i) => {
+    const btn = document.getElementById('areaBtn'+i);
+    if (btn) btn.className = 'btn' + (a===currentArea ? ' acc' : '');
+  });
 }
+// 初期ハイライト
+setTimeout(() => switchArea(AREAS[0]), 0);
 
-// ════════════════════════════════════════════════
-//  DEMO MODE (simulate GPS for testing without device)
-// ════════════════════════════════════════════════
-let demoMode = false;
-let demoBaseAlt = 10.000;
-
-function startDemo() {
-  demoMode = true;
-  setConnected(true);
-  let t = 0;
-  setInterval(() => {
-    if (!demoMode) return;
-    t += 0.05;
-    gpsData.alt  = demoBaseAlt + Math.sin(t) * 0.08 + (Math.random() - 0.5) * 0.003;
-    gpsData.hdop = 0.6 + Math.random() * 0.2;
-    gpsData.sats = 14 + Math.floor(Math.random() * 3);
-    gpsData.fix  = 4;  // RTK
-    gpsData.lat  = 37.5;
-    gpsData.lon  = 138.9;
-    updateGPSUI();
-    logNMEA('$GPGGA demo RTK alt=' + gpsData.alt.toFixed(4));
-    // Simulate self-marker movement and heading for demo
-    selfMarker.heading = ((selfMarker.heading || 0) + 0.4) % 360;
-    selfMarker.lat  = 37.5001 + Math.sin(t * 0.3) * 0.00005;
-    selfMarker.lon  = 138.9001 + Math.cos(t * 0.2) * 0.00005;
-    selfMarker.accuracy = 1.5;
-    const hd = document.getElementById('headingDisplay');
-    const ms = document.getElementById('markerStatus');
-    if (hd) hd.textContent = Math.round(selfMarker.heading) + '° ' + headingToDir(selfMarker.heading);
-    if (ms) { ms.textContent = 'デモ ±1.5m'; ms.style.color = '#ffaa00'; }
-    drawHeatmap();
-  }, 200);
-}
-
-// Add demo button next to connect
-const demoBtn = document.createElement('button');
-demoBtn.className = 'btn';
-demoBtn.textContent = 'デモ';
-demoBtn.title = '実機なしでデモ動作';
-demoBtn.style.cssText = 'font-size:10px;padding:5px 8px;';
-demoBtn.onclick = () => { startDemo(); demoBtn.disabled = true; };
-document.getElementById('btnConnect').parentNode.appendChild(demoBtn);
-
-// ════════════════════════════════════════════════
-//  FIELD MANAGEMENT
-// ════════════════════════════════════════════════
 document.getElementById('btnNewField').onclick = () => {
+  document.getElementById('modalOverlay').style.display = 'flex';
   document.getElementById('fieldNameInput').value = '';
   document.getElementById('fieldNoteInput').value = '';
-  document.getElementById('modalOverlay').classList.add('open');
-  document.getElementById('fieldNameInput').focus();
+  setTimeout(() => document.getElementById('fieldNameInput').focus(), 100);
 };
-
 document.getElementById('btnModalCancel').onclick = () => {
-  document.getElementById('modalOverlay').classList.remove('open');
+  document.getElementById('modalOverlay').style.display = 'none';
 };
-
 document.getElementById('btnModalCreate').onclick = () => {
-  const name = document.getElementById('fieldNameInput').value.trim() || ('圃場' + (db.fields.length + 1));
-  const note = document.getElementById('fieldNoteInput').value.trim();
-  const gx   = Math.max(1, Math.min(30, parseInt(document.getElementById('gridX').value) || 5));
-  const gy   = Math.max(1, Math.min(30, parseInt(document.getElementById('gridY').value) || 5));
-
+  const name = document.getElementById('fieldNameInput').value.trim();
+  if (!name) { alert('圃場名を入力してください'); return; }
+  const gx = Math.max(1, Math.min(30, parseInt(document.getElementById('gridX').value) || 5));
+  const gy = Math.max(1, Math.min(30, parseInt(document.getElementById('gridY').value) || 4));
   const field = {
-    id:      Date.now(),
+    id: Date.now(),
     name,
-    note,
-    gridX:   gx,
-    gridY:   gy,
-    created: new Date().toLocaleDateString('ja-JP'),
-    points:  []   // { row, col, alt }
+    note: document.getElementById('fieldNoteInput').value.trim(),
+    gridX: gx, gridY: gy,
+    centerAlt: null,
+    points: [],
+    created: new Date().toLocaleDateString('ja-JP')
   };
-
-  db.fields.push(field);
+  areaFields().push(field);
   saveDB();
+  document.getElementById('modalOverlay').style.display = 'none';
   renderFieldList();
   selectField(field.id);
-  document.getElementById('modalOverlay').classList.remove('open');
 };
 
 function renderFieldList() {
   const list = document.getElementById('fieldList');
-  document.getElementById('fieldCount').textContent = db.fields.length;
-
-  if (db.fields.length === 0) {
-    list.innerHTML = '<div class="empty-state">圃場がありません<br>「新規圃場を作成」から<br>測定を開始してください</div>';
-    return;
-  }
-
-  list.innerHTML = db.fields.map(f => {
-    const pts = f.points || [];
-    const alts = pts.map(p => p.alt);
-    const range = alts.length > 1
-      ? ((Math.max(...alts) - Math.min(...alts)) * 100).toFixed(1) + ' cm'
-      : alts.length === 1 ? '測定中' : '—';
-    const active = currentField && currentField.id === f.id ? ' active' : '';
-    return `
-    <div class="fc${active}" data-id="${f.id}">
+  document.getElementById('fieldCount').textContent = areaFields().length;
+  if (!areaFields().length) { list.innerHTML = '<div style="font-size:9px;color:#6a80a8;padding:4px">圃場がありません</div>'; return; }
+  list.innerHTML = areaFields().map(f => {
+    const pts = (f.points||[]).filter(p=>!p.extra).length;
+    const active = currentField && currentField.id === f.id;
+    return `<div class="fc${active?' active':''}" data-id="${f.id}">
       <div class="fc-name">${f.name}</div>
-      <div class="fc-meta">${f.created} ${f.gridX}×${f.gridY} ${pts.length}/${f.gridX * f.gridY}点</div>
-      <div class="fc-rng">${alts.length > 0 ? '高低差 ' + range : '未測定'}</div>
-      <button class="fc-del" data-del="${f.id}" title="削除">✕</button>
+      <div class="fc-meta">${f.created||''} ${pts}点</div>
+      ${f.centerAlt!=null?'<div class="fc-meta" style="color:#00d4aa">基準:'+f.centerAlt.toFixed(3)+'m</div>':''}
+      <button class="btn red" data-del="${f.id}" style="padding:2px 6px;font-size:8px;margin-top:2px">削除</button>
     </div>`;
   }).join('');
-
   list.querySelectorAll('.fc').forEach(card => {
-    card.addEventListener('click', e => {
-      if (e.target.dataset.del) return;
-      selectField(parseInt(card.dataset.id));
-    });
+    card.addEventListener('click', e => { if (e.target.dataset.del) return; selectField(parseInt(card.dataset.id)); });
   });
-
   list.querySelectorAll('[data-del]').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      if (confirm('この圃場を削除しますか？')) {
-        db.fields = db.fields.filter(f => f.id !== parseInt(btn.dataset.del));
-        saveDB();
-        if (currentField && currentField.id === parseInt(btn.dataset.del)) {
-          currentField = null;
-          showGuide(true);
-        }
-        renderFieldList();
-      }
+      if (!confirm('削除しますか？')) return;
+      db[currentArea].fields = areaFields().filter(f => f.id !== parseInt(btn.dataset.del));
+      saveDB();
+      if (currentField && currentField.id === parseInt(btn.dataset.del)) { currentField = null; showGuide(true); }
+      renderFieldList();
     });
   });
 }
 
 function selectField(id) {
-  autoRecording = false;  // 圃場切替時は自動記録停止
-  currentField = db.fields.find(f => f.id === id);
+  autoRecording = false;
+  currentField = areaFields().find(f => f.id === id);
   if (!currentField) return;
   renderFieldList();
   showGuide(false);
-  document.getElementById('mainTitle').textContent = currentField.name + (currentField.note ? ' — ' + currentField.note : '');
+  document.getElementById('mainTitle').textContent = currentField.name + (currentField.note ? ' — '+currentField.note : '');
   updateMeasureLabel();
   drawHeatmap();
-  // 自動記録ステータス表示リセット
   const status = document.getElementById('autoRecordStatus');
   if (status) {
     if (currentField.centerAlt != null) {
-      const done = (currentField.points||[]).filter(p=>!p.extra).length;
-      const total = currentField.gridX * currentField.gridY;
-      status.textContent = done >= total ? '✅ 記録完了 — 基準点を再設定で再開' : '⏸ 一時停止 — 基準点を設定で再開';
-      status.style.color = done >= total ? 'var(--grn)' : 'var(--txt2)';
+      status.textContent = '⏸ 基準点を再設定で再開';
+      status.style.color = 'var(--txt2)';
     } else {
       status.textContent = '基準点設定後は走行するだけで自動記録';
       status.style.color = 'var(--txt2)';
@@ -874,107 +718,39 @@ function selectField(id) {
 }
 
 function showGuide(v) {
-  document.getElementById('guide').style.display = v ? 'flex' : 'none';
-  document.getElementById('legend').style.display = v ? 'none' : 'block';
-  document.getElementById('statsRow').style.display = v ? 'none' : 'flex';
-  document.getElementById('mainTitle').textContent = v ? '圃場を選択してください' : (currentField?.name || '');
+  document.getElementById('guide').style.display     = v ? 'flex' : 'none';
+  document.getElementById('legend').style.display    = v ? 'none' : 'block';
+  document.getElementById('statsRow').style.display  = v ? 'none' : 'flex';
+  document.getElementById('mainTitle').textContent   = v ? '圃場を選択してください' : (currentField?.name||'');
 }
 
-// ════════════════════════════════════════════════
-//  MEASURE  -- センター1点基準モード
-// ════════════════════════════════════════════════
-// ── 自動記録の状態管理 ──
+// ════════════════════════════════════════════
+//  基準点 & 自動記録
+// ════════════════════════════════════════════
 let autoRecording = false;
 let lastAutoRecordTime = 0;
-const AUTO_RECORD_INTERVAL = 2000; // 2秒ごとに最大1回記録
 
 document.getElementById('btnMeasure').onclick = () => {
   if (!currentField) { alert('圃場を選択してください'); return; }
-  if (gpsData.alt == null) { alert('GPS高度データがありません\nDGのRTK接続を確認してください'); return; }
-
-  // センター基準点を記録してから自動記録開始
+  if (gpsData.alt == null) { alert('GPS高度データがありません'); return; }
   currentField.centerAlt = gpsData.alt;
-  currentField.points = [];
-  autoRecording = true;
-  saveDB(); drawHeatmap(); renderFieldList();
-  updateMeasureLabel();
-
+  currentField.points    = [];
+  autoRecording          = true;
+  saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel();
   const status = document.getElementById('autoRecordStatus');
-  if (status) {
-    status.textContent = '🟢 自動記録中 — 走行するだけで記録されます';
-    status.style.color = 'var(--acc)';
-  }
-  flashMeasureBtn('✓ 基準点設定 — 自動記録開始');
-};
-
-// 自動記録: GPS更新のたびに呼ばれる
-function tryAutoRecord() {
-  if (!autoRecording) return;
-  if (!currentField) return;
-  if (currentField.centerAlt == null) return;
-  if (gpsData.lat == null || gpsData.alt == null) return;
-
-  const now = Date.now();
-  if (now - lastAutoRecordTime < AUTO_RECORD_INTERVAL) return;
-  lastAutoRecordTime = now;
-
-  // 現在位置から最近接の未記録格子点を探す
-  const gx = currentField.gridX, gy = currentField.gridY;
-  const taken = new Set(currentField.points.filter(p=>!p.extra).map(p => p.row + '_' + p.col));
-
-  // 格子点が全部記録済みなら自動更新（既存点を現在値で上書き）
-  const allTaken = taken.size >= gx * gy;
-  if (allTaken) {
-    // 全点記録済み: 最も近い格子点を上書き更新
-    let bestIdx = -1, bestDist = Infinity;
-    currentField.points.forEach((p, i) => {
-      if (p.extra) return;
-      const dist = Math.sqrt((p.lat - gpsData.lat)**2 + (p.lon - gpsData.lon)**2);
-      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
-    });
-    if (bestIdx >= 0) {
-      currentField.points[bestIdx].alt = gpsData.alt;
-      currentField.points[bestIdx].lat = gpsData.lat;
-      currentField.points[bestIdx].lon = gpsData.lon;
-    }
-    saveDB(); drawHeatmap();
-    return;
-  }
-
-  // 未記録の格子点に順番に記録
-  for (let r = 0; r < gy; r++) {
-    for (let col2 = 0; col2 < gx; col2++) {
-      if (!taken.has(r + '_' + col2)) {
-        currentField.points.push({
-          row: r, col: col2,
-          alt: gpsData.alt,
-          lat: gpsData.lat, lon: gpsData.lon
-        });
-        saveDB(); drawHeatmap(); renderFieldList();
-
-        const status = document.getElementById('autoRecordStatus');
-        const done = currentField.points.filter(p=>!p.extra).length;
-        const total = gx * gy;
-        if (status) {
-          status.textContent = '🟢 自動記録中 ' + done + '/' + total + '点';
-          if (done >= total) {
-            status.textContent = '✅ 全格子点記録完了 — 走行で更新中';
-            status.style.color = 'var(--grn)';
-          }
-        }
-        return;
-      }
-    }
-  }
+  if (status) { status.textContent = '🟢 自動記録中 — 走行するだけで記録されます'; status.style.color = 'var(--acc)'; }
+  const btn = document.getElementById('btnMeasure');
+  btn.textContent = '✓ 基準点設定 — 自動記録開始';
+  setTimeout(() => updateMeasureLabel(), 1200);
 };
 
 document.getElementById('btnResetCenter').onclick = () => {
   if (!currentField) return;
-  if (!confirm('基準点（センター高度）をリセットしますか？\n測定データもすべて消えます。')) return;
+  if (!confirm('基準点をリセットしますか？\n測定データも消えます。')) return;
   currentField.centerAlt = null;
-  currentField.points = [];
-  saveDB(); drawHeatmap(); renderFieldList();
-  updateMeasureLabel();
+  currentField.points    = [];
+  autoRecording          = false;
+  saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel();
 };
 
 function updateMeasureLabel() {
@@ -989,555 +765,158 @@ function updateMeasureLabel() {
   }
 }
 
-function flashMeasureBtn(msg) {
-  const btn = document.getElementById('btnMeasure');
-  const prev = btn.textContent;
-  const prevBg = btn.style.background;
-  btn.style.background = 'linear-gradient(135deg,#00ff88,#00cc44)';
-  btn.textContent = msg || '✓ 記録しました';
-  setTimeout(() => {
-    btn.style.background = prevBg;
-    btn.textContent = prev;
-    updateMeasureLabel();
-  }, 1200);
+function tryAutoRecord() {
+  if (!autoRecording || !currentField || currentField.centerAlt == null) return;
+  if (gpsData.lat == null || gpsData.alt == null) return;
+  const now = Date.now();
+  if (now - lastAutoRecordTime < 2000) return;
+  lastAutoRecordTime = now;
+  currentField.points.push({ alt:gpsData.alt, lat:gpsData.lat, lon:gpsData.lon, row:-1, col:-1 });
+  saveDB(); drawHeatmap(); renderFieldList();
+  const status = document.getElementById('autoRecordStatus');
+  if (status) { status.textContent = '🟢 自動記録中 '+currentField.points.length+'点'; status.style.color = 'var(--acc)'; }
 }
 
-// ════════════════════════════════════════════════
-//  HEATMAP RENDERER
-// ════════════════════════════════════════════════
+// ════════════════════════════════════════════
+//  ヒートマップ描画（正方形1枚）
+// ════════════════════════════════════════════
+const canvas = document.getElementById('heatmap');
+const ctx    = canvas.getContext('2d');
+
 function resizeCanvas() {
-  const W = Math.max(window.innerWidth  - 200 - 220, 100);
-  const H = Math.max(window.innerHeight - 36,  100);
-  canvas.width        = W;
-  canvas.height       = H;
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
+  const W = Math.max(window.innerWidth - 200 - 220, 100);
+  const H = Math.max(window.innerHeight - 36, 100);
+  canvas.width  = W; canvas.height = H;
+  canvas.style.width  = W+'px'; canvas.style.height = H+'px';
 }
-
 window.addEventListener('resize', () => { resizeCanvas(); drawHeatmap(); });
 window.addEventListener('orientationchange', () => { setTimeout(()=>{ resizeCanvas(); drawHeatmap(); }, 300); });
 resizeCanvas();
 
+function idw(known, px, py, power) {
+  let num=0, den=0;
+  for (const k of known) {
+    const d = Math.sqrt((k.px-px)**2+(k.py-py)**2);
+    if (d < 0.001) return k.alt;
+    const w = 1/(d**power); num+=w*k.alt; den+=w;
+  }
+  return den===0 ? known[0].alt : num/den;
+}
+
+function altColor(t) {
+  t = Math.max(0, Math.min(1, t));
+  if (t < 0.5) { const s=t*2; return [Math.round(30+s*4), Math.round(100+s*100), Math.round(255-s*195)]; }
+  const s=(t-0.5)*2; return [Math.round(34+s*186), Math.round(200-s*160), Math.round(60-s*20)];
+}
+
 function drawHeatmap() {
   if (!currentField) return;
-  const W = Math.max(window.innerWidth  - 200 - 220, 100);
-  const H = Math.max(window.innerHeight - 36,  100);
-  canvas.width        = W;
-  canvas.height       = H;
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
-  const { points } = currentField;
+  const W = Math.max(window.innerWidth - 200 - 220, 100);
+  const H = Math.max(window.innerHeight - 36, 100);
+  canvas.width  = W; canvas.height = H;
+  canvas.style.width  = W+'px'; canvas.style.height = H+'px';
   ctx.clearRect(0, 0, W, H);
 
-  // センター基準点未設定
+  // 基準点未設定
   const centerEl = document.getElementById('centerAltDisplay');
   if (currentField.centerAlt == null) {
-    if (centerEl) { centerEl.textContent = '未記録'; centerEl.style.color = '#ffaa00'; }
+    if (centerEl) { centerEl.textContent='未記録'; centerEl.style.color='#ffaa00'; }
     updateMeasureLabel();
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.font = '13px Noto Sans JP, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.font='13px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText('GPS接続して基準点を設定 → 走行で自動記録', W/2, H/2);
-    document.getElementById('statsRow').style.display = 'none';
+    document.getElementById('statsRow').style.display='none';
     return;
   }
-
-  if (centerEl) {
-    centerEl.textContent = currentField.centerAlt.toFixed(4) + ' m';
-    centerEl.style.color = '#22c850';
-  }
+  if (centerEl) { centerEl.textContent=currentField.centerAlt.toFixed(4)+' m'; centerEl.style.color='#22c850'; }
   updateMeasureLabel();
 
-  const measured = points.filter(p => !p.extra);
+  const measured = (currentField.points||[]);
   if (measured.length === 0) {
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.font = '13px Noto Sans JP, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.font='13px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText('走行して測定点を記録してください', W/2, H/2);
-    document.getElementById('statsRow').style.display = 'none';
+    document.getElementById('statsRow').style.display='none';
     return;
   }
 
   const altCenter = currentField.centerAlt;
-  const alts = measured.map(p => p.alt);
-  const altMax = Math.max(...alts);
-  const altMin = Math.min(...alts);
-  const maxDev = Math.max(Math.abs(altMax - altCenter), Math.abs(altMin - altCenter), 0.001);
-  const spread = maxDev * 2;
+  const alts  = measured.map(p=>p.alt);
+  const altMax= Math.max(...alts), altMin=Math.min(...alts);
+  const maxDev= Math.max(Math.abs(altMax-altCenter), Math.abs(altMin-altCenter), 0.001);
+  const spread= maxDev*2;
 
-  // stats更新
-  document.getElementById('statsRow').style.display = 'flex';
-  const hiCm = (altMax - altCenter) * 100;
-  const loCm = (altMin - altCenter) * 100;
-  document.getElementById('statHi').textContent    = (hiCm >= 0 ? '+' : '') + hiCm.toFixed(1);
-  document.getElementById('statLo').textContent    = (loCm >= 0 ? '+' : '') + loCm.toFixed(1);
-  document.getElementById('statRange').textContent = ((altMax - altMin) * 100).toFixed(1);
-  document.getElementById('statPoints').textContent = measured.length + '点';
-  document.getElementById('legHi').textContent = (hiCm >= 0 ? '+' : '') + hiCm.toFixed(1) + ' cm';
-  document.getElementById('legLo').textContent = (loCm >= 0 ? '+' : '') + loCm.toFixed(1) + ' cm';
+  // stats
+  document.getElementById('statsRow').style.display='flex';
+  const hiCm=(altMax-altCenter)*100, loCm=(altMin-altCenter)*100;
+  document.getElementById('statHi').textContent    = (hiCm>=0?'+':'')+hiCm.toFixed(1);
+  document.getElementById('statLo').textContent    = (loCm>=0?'+':'')+loCm.toFixed(1);
+  document.getElementById('statRange').textContent = ((altMax-altMin)*100).toFixed(1);
+  document.getElementById('statPoints').textContent= measured.length+'点';
+  document.getElementById('legHi').textContent = (hiCm>=0?'+':'')+hiCm.toFixed(1)+' cm';
+  document.getElementById('legLo').textContent = (loCm>=0?'+':'')+loCm.toFixed(1)+' cm';
 
-  // 圃場全体をcanvasいっぱいの正方形で表示（padding 20px）
-  const pad = 20;
-  const size = Math.min(W, H) - pad * 2;
-  const ox = (W - size) / 2;
-  const oy = (H - size) / 2;
+  // 正方形
+  const pad  = 20;
+  const size = Math.min(W,H) - pad*2;
+  const ox   = (W-size)/2;
+  const oy   = (H-size)/2;
 
-  // 測定点の緯度経度範囲を取得
-  const lats = measured.filter(p => p.lat != null).map(p => p.lat);
-  const lons = measured.filter(p => p.lon != null).map(p => p.lon);
-
-  if (lats.length < 2) {
-    // 緯度経度がない場合は測定順に並べてIDW補間
-    const res = 4;
-    const cols = Math.ceil(size / res);
-    const rows2 = Math.ceil(size / res);
-    const known = measured.map((p, i) => {
-      const gx = currentField.gridX || 5;
-      const gy = currentField.gridY || 4;
-      const col2 = p.col >= 0 ? p.col : i % gx;
-      const row2 = p.row >= 0 ? p.row : Math.floor(i / gx);
-      return {
-        px: ox + (col2 / (gx-1||1)) * size,
-        py: oy + (row2 / (gy-1||1)) * size,
-        alt: p.alt
-      };
-    });
-    const id = ctx.createImageData(cols * res, rows2 * res);
-    for (let r = 0; r < rows2; r++) for (let cc = 0; cc < cols; cc++) {
-      const x = ox + cc * res, y = oy + r * res;
-      const interp = known.length === 1 ? known[0].alt : idw(known, x, y, 2);
-      const norm = 0.5 + (interp - altCenter) / spread;
-      const [cr, cg, cb] = altColor(norm);
-      for (let dy = 0; dy < res; dy++) for (let dx = 0; dx < res; dx++) {
-        const idx = ((r*res+dy)*(cols*res)+cc*res+dx)*4;
-        id.data[idx]=cr; id.data[idx+1]=cg; id.data[idx+2]=cb; id.data[idx+3]=220;
-      }
-    }
-    const oc = new OffscreenCanvas(cols*res, rows2*res);
-    oc.getContext('2d').putImageData(id, 0, 0);
-    ctx.drawImage(oc, ox, oy, size, size);
-  } else {
-    // 緯度経度がある場合は実際の位置でプロット
-    const latMax = Math.max(...lats), latMin = Math.min(...lats);
-    const lonMax = Math.max(...lons), lonMin = Math.min(...lons);
-    const latRange = Math.max(latMax - latMin, 0.00001);
-    const lonRange = Math.max(lonMax - lonMin, 0.00001);
-
-    const known = measured.filter(p => p.lat != null).map(p => ({
-      px: ox + ((p.lon - lonMin) / lonRange) * size,
-      py: oy + ((latMax - p.lat) / latRange) * size,
+  // 既知点をcanvas座標に変換
+  const lats = measured.filter(p=>p.lat!=null).map(p=>p.lat);
+  const lons = measured.filter(p=>p.lon!=null).map(p=>p.lon);
+  let known;
+  if (lats.length >= 2) {
+    const latMax2=Math.max(...lats),latMin2=Math.min(...lats);
+    const lonMax2=Math.max(...lons),lonMin2=Math.min(...lons);
+    const latR=Math.max(latMax2-latMin2,0.00001), lonR=Math.max(lonMax2-lonMin2,0.00001);
+    known = measured.filter(p=>p.lat!=null).map(p=>({
+      px: ox+((p.lon-lonMin2)/lonR)*size,
+      py: oy+((latMax2-p.lat)/latR)*size,
       alt: p.alt
     }));
-
-    const res = 4;
-    const cols = Math.ceil(size / res);
-    const rows2 = Math.ceil(size / res);
-    const id = ctx.createImageData(cols * res, rows2 * res);
-    for (let r = 0; r < rows2; r++) for (let cc = 0; cc < cols; cc++) {
-      const x = ox + cc * res, y = oy + r * res;
-      const interp = known.length === 1 ? known[0].alt : idw(known, x, y, 2);
-      const norm = 0.5 + (interp - altCenter) / spread;
-      const [cr, cg, cb] = altColor(norm);
-      for (let dy = 0; dy < res; dy++) for (let dx = 0; dx < res; dx++) {
-        const idx = ((r*res+dy)*(cols*res)+cc*res+dx)*4;
-        id.data[idx]=cr; id.data[idx+1]=cg; id.data[idx+2]=cb; id.data[idx+3]=220;
-      }
-    }
-    const oc = new OffscreenCanvas(cols*res, rows2*res);
-    oc.getContext('2d').putImageData(id, 0, 0);
-    ctx.drawImage(oc, ox, oy, size, size);
+  } else {
+    known = measured.map((p,i)=>({ px: ox+(i/(measured.length-1||1))*size, py: H/2, alt:p.alt }));
   }
+
+  // IDW補間
+  const res=4, cols=Math.ceil(size/res), rows2=Math.ceil(size/res);
+  const imgData=ctx.createImageData(cols*res,rows2*res);
+  for (let r=0;r<rows2;r++) for (let cc=0;cc<cols;cc++) {
+    const x=ox+cc*res, y=oy+r*res;
+    const v = known.length===1 ? known[0].alt : idw(known,x,y,2);
+    const norm=0.5+(v-altCenter)/spread;
+    const [cr,cg,cb]=altColor(norm);
+    for (let dy=0;dy<res;dy++) for (let dx=0;dx<res;dx++) {
+      const idx=((r*res+dy)*(cols*res)+cc*res+dx)*4;
+      imgData.data[idx]=cr; imgData.data[idx+1]=cg; imgData.data[idx+2]=cb; imgData.data[idx+3]=220;
+    }
+  }
+  const oc=new OffscreenCanvas(cols*res,rows2*res);
+  oc.getContext('2d').putImageData(imgData,0,0);
+  ctx.drawImage(oc,ox,oy,size,size);
 
   // 枠線
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(ox, oy, size, size);
+  ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+  ctx.strokeRect(ox,oy,size,size);
 
   // センター基準点マーカー（中心に十字）
-  ctx.strokeStyle = '#ffaa00';
-  ctx.lineWidth = 2;
+  const cx=W/2, cy=H/2;
+  ctx.strokeStyle='#ffaa00'; ctx.lineWidth=2;
   ctx.beginPath();
-  ctx.moveTo(W/2 - 12, H/2); ctx.lineTo(W/2 + 12, H/2);
-  ctx.moveTo(W/2, H/2 - 12); ctx.lineTo(W/2, H/2 + 12);
+  ctx.moveTo(cx-14,cy); ctx.lineTo(cx+14,cy);
+  ctx.moveTo(cx,cy-14); ctx.lineTo(cx,cy+14);
   ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2);
+  ctx.fillStyle='#ffaa00'; ctx.fill();
 }
 
-function drawEmptyGrid(gx, gy, W, H) {
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.font = '13px Noto Sans JP, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('GPS接続して基準点を設定 → 走行で自動記録', W/2, H/2);
-}
-
-// IDW (Inverse Distance Weighting)
-function idw(known, px, py, power) {
-  let num = 0, den = 0;
-  for (const k of known) {
-    const d = Math.sqrt((k.px - px) ** 2 + (k.py - py) ** 2);
-    if (d < 0.001) return k.alt;
-    const w = 1 / (d ** power);
-    num += w * k.alt;
-    den += w;
-  }
-  return den === 0 ? known[0].alt : num / den;
-}
-
-// Color ramp: blue(low) → green(center/mean) → red(high)
-function altColor(t) {
-  // t: 0=lowest(blue), 0.5=mean(green), 1=highest(red)
-  if (t < 0.5) {
-    const s = t * 2;  // 0→1: blue→green
-    return [
-      Math.round(30  + s * (34  - 30)),   // R: 30→34
-      Math.round(100 + s * (200 - 100)),  // G: 100→200
-      Math.round(255 + s * (60  - 255))   // B: 255→60
-    ];
-  } else {
-    const s = (t - 0.5) * 2;  // 0→1: green→red
-    return [
-      Math.round(34  + s * (220 - 34)),   // R: 34→220
-      Math.round(200 + s * (40  - 200)),  // G: 200→40
-      Math.round(60  + s * (40  - 60))    // B: 60→40
-    ];
-  }
-}
-
-// ════════════════════════════════════════════════
-//  TOOLTIP ON HOVER
-// ════════════════════════════════════════════════
-canvas.addEventListener('mousemove', (e) => {
-  if (!currentField) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-  const { gridX, gridY, points } = currentField;
-
-  const padX = 40, padY = 40;
-  const plotW = canvas.width - padX * 2;
-  const plotH = canvas.height - padY * 2;
-
-  let closest = null, minD = Infinity;
-  for (let r = 0; r < gridY; r++) {
-    for (let c = 0; c < gridX; c++) {
-      const px = padX + (c / (gridX - 1 || 1)) * plotW;
-      const py = padY + (r / (gridY - 1 || 1)) * plotH;
-      const d  = Math.sqrt((px - mx) ** 2 + (py - my) ** 2);
-      if (d < minD) { minD = d; closest = { r, c, px, py }; }
-    }
-  }
-
-  const tip = document.getElementById('tooltip');
-  if (closest && minD < 24) {
-    const pt = points.find(p => p.row === closest.r && p.col === closest.c);
-    const base = currentField.centerAlt || 0;
-    if (pt) {
-      const cm = ((pt.alt - base) * 100).toFixed(1);
-      tip.innerHTML = `<b>(${closest.c+1}, ${closest.r+1})</b> &nbsp; 相対高度: <span style="color:${cm>=0?'#ff6666':'#6699ff'}">${cm >= 0 ? '+' : ''}${cm} cm</span><br><span style="color:var(--text2);font-size:10px">標高 ${pt.alt.toFixed(4)} m</span>`;
-    } else {
-      tip.innerHTML = `<b>(${closest.c+1}, ${closest.r+1})</b> &nbsp; <span style="color:var(--text2)">未測定</span>`;
-    }
-    tip.style.left  = (closest.px + 14) + 'px';
-    tip.style.top   = (closest.py - 16) + 'px';
-    tip.classList.add('visible');
-  } else {
-    tip.classList.remove('visible');
-  }
-});
-
-canvas.addEventListener('mouseleave', () => {
-  document.getElementById('tooltip').classList.remove('visible');
-});
-
-// ════════════════════════════════════════════════
-//  CLICK TO MANUALLY EDIT
-// ════════════════════════════════════════════════
-canvas.addEventListener('click', (e) => {
-  if (!currentField) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-  const { gridX, gridY, points } = currentField;
-  const padX = 40, padY = 40;
-  const plotW = canvas.width - padX * 2;
-  const plotH = canvas.height - padY * 2;
-
-  let closest = null, minD = Infinity;
-  for (let r = 0; r < gridY; r++) {
-    for (let c = 0; c < gridX; c++) {
-      const px = padX + (c / (gridX - 1 || 1)) * plotW;
-      const py = padY + (r / (gridY - 1 || 1)) * plotH;
-      const d  = Math.sqrt((px - mx) ** 2 + (py - my) ** 2);
-      if (d < minD) { minD = d; closest = { r, c }; }
-    }
-  }
-
-  if (!closest || minD > 20) return;
-  const existing = points.find(p => p.row === closest.r && p.col === closest.c);
-
-  if (existing) {
-    const action = confirm(`(${closest.c+1}, ${closest.r+1}) の測定点\n標高: ${existing.alt.toFixed(4)} m\n\n「OK」→ 削除 / 「キャンセル」→ そのまま`);
-    if (action) {
-      currentField.points = points.filter(p => !(p.row === closest.r && p.col === closest.c));
-      saveDB(); drawHeatmap(); renderFieldList();
-    }
-  }
-});
-
-// Throttled redraw for compass/geo updates (max ~30fps)
-let _markerRafId = null;
-function scheduleMarkerUpdate() {
-  if (_markerRafId) return;
-  _markerRafId = requestAnimationFrame(() => {
-    _markerRafId = null;
-    drawHeatmap();
-  });
-}
-
-// ════════════════════════════════════════════════
-//  SELF MARKER — GPS position + compass heading
-// ════════════════════════════════════════════════
-let selfMarker = {
-  lat: null, lon: null,
-  heading: null,   // degrees, 0=North, clockwise
-  accuracy: null
-};
-
-// Geolocation — phone GPS (for marker position on canvas)
-let watchId = null;
-function startGeolocation() {
-  if (!navigator.geolocation) return;
-  watchId = navigator.geolocation.watchPosition(
-    pos => {
-      selfMarker.lat = pos.coords.latitude;
-      selfMarker.lon = pos.coords.longitude;
-      selfMarker.accuracy = pos.coords.accuracy;
-      const ms = document.getElementById('markerStatus');
-      if (ms) {
-        ms.textContent = 'GPS取得済 ±' + Math.round(pos.coords.accuracy) + 'm';
-        ms.style.color = '#00d4aa';
-      }
-      scheduleMarkerUpdate();
-    },
-    err => {
-      const ms = document.getElementById('markerStatus');
-      let msg = 'GPS エラー';
-      switch (err.code) {
-        case 1: msg = '位置情報の許可が必要です\nChrome設定→サイト設定→位置情報→許可'; break;
-        case 2: msg = 'GPS信号なし（屋外に出てください）'; break;
-        case 3: msg = 'GPS取得タイムアウト（再試行します）'; break;
-      }
-      if (ms) { ms.textContent = msg; ms.style.color = '#ff4040'; }
-      console.warn('Geo error', err.code, err.message);
-    },
-    { enableHighAccuracy: true, maximumAge: 500, timeout: 10000 }
-  );
-}
-
-// DeviceOrientation — compass heading
-function startCompass() {
-  // iOS 13+ requires permission
-  if (typeof DeviceOrientationEvent !== 'undefined' &&
-      typeof DeviceOrientationEvent.requestPermission === 'function') {
-    DeviceOrientationEvent.requestPermission().then(state => {
-      if (state === 'granted') _listenOrientation();
-    }).catch(() => {});
-  } else {
-    _listenOrientation();
-  }
-}
-function _listenOrientation() {
-  let absoluteFired = false;
-  window.addEventListener('deviceorientationabsolute', (e) => {
-    absoluteFired = true;
-    _handleOrientation(e);
-  }, true);
-  window.addEventListener('deviceorientation', (e) => {
-    if (!absoluteFired) _handleOrientation(e);
-  }, true);
-}
-function _handleOrientation(e) {
-  let h = null;
-  if (e.webkitCompassHeading != null) {
-    h = e.webkitCompassHeading; // iOS — already absolute north-relative
-  } else if (e.absolute && e.alpha != null) {
-    h = (360 - e.alpha) % 360;  // Android absolute
-  } else if (e.alpha != null) {
-    h = (360 - e.alpha) % 360;  // fallback
-  }
-  if (h != null) {
-    selfMarker.heading = h;
-    scheduleMarkerUpdate();
-  }
-}
-
-// Convert WGS84 lat/lon to canvas pixel coordinates
-// Uses the first and last measured grid points as anchor if available
-function latLonToCanvas(lat, lon) {
-  if (!currentField) return null;
-  const { gridX, gridY, points } = currentField;
-  if (!points || points.length < 2) return null;
-
-  // Need at least 2 points with lat/lon to do mapping
-  const anchors = points.filter(p => p.lat != null && p.lon != null && !p.extra);
-  if (anchors.length < 2) return null;
-
-  const padX = 40, padY = 40;
-  const plotW = canvas.width - padX * 2;
-  const plotH = canvas.height - padY * 2;
-
-  function cellToPlot(col, row) {
-    return [
-      padX + (col / (gridX - 1 || 1)) * plotW,
-      padY + (row / (gridY - 1 || 1)) * plotH
-    ];
-  }
-
-  // Compute affine transform lat/lon → canvas px using least-squares from anchors
-  // Simple approach: use bounding box of anchor lat/lons mapped to canvas bounding box
-  const latMin = Math.min(...anchors.map(p => p.lat));
-  const latMax = Math.max(...anchors.map(p => p.lat));
-  const lonMin = Math.min(...anchors.map(p => p.lon));
-  const lonMax = Math.max(...anchors.map(p => p.lon));
-
-  if (latMax === latMin || lonMax === lonMin) return null;
-
-  // Find canvas extents from anchor cell positions
-  const cxMin = Math.min(...anchors.map(p => cellToPlot(p.col, p.row)[0]));
-  const cxMax = Math.max(...anchors.map(p => cellToPlot(p.col, p.row)[0]));
-  const cyMin = Math.min(...anchors.map(p => cellToPlot(p.col, p.row)[1]));
-  const cyMax = Math.max(...anchors.map(p => cellToPlot(p.col, p.row)[1]));
-
-  const px = cxMin + ((lon - lonMin) / (lonMax - lonMin)) * (cxMax - cxMin);
-  // lat increases northward, canvas y increases downward
-  const py = cyMax - ((lat - latMin) / (latMax - latMin)) * (cyMax - cyMin);
-
-  return [px, py];
-}
-
-// Draw the self-position triangle on canvas
-function drawSelfMarker() {
-  if (selfMarker.lat == null || selfMarker.lon == null) return;
-
-  const pos = latLonToCanvas(selfMarker.lat, selfMarker.lon);
-  // If can't map to canvas (not enough anchors), draw in corner as compass-only
-  const hasPos = pos && !isNaN(pos[0]) && !isNaN(pos[1]);
-
-  const mx = hasPos ? pos[0] : 30;
-  const my = hasPos ? pos[1] : 30;
-  const heading = selfMarker.heading != null ? selfMarker.heading : 0;
-  const rad = (heading - 90) * Math.PI / 180; // canvas: 0rad = right, heading 0=North=up
-
-  const SIZE = 16; // triangle half-size
-
-  ctx.save();
-  ctx.translate(mx, my);
-  ctx.rotate(rad);
-
-  // Triangle body — bright yellow, easy to see on any heatmap color
-  ctx.beginPath();
-  ctx.moveTo(SIZE, 0);           // tip (points in heading direction)
-  ctx.lineTo(-SIZE * 0.7, -SIZE * 0.65);
-  ctx.lineTo(-SIZE * 0.4, 0);
-  ctx.lineTo(-SIZE * 0.7, SIZE * 0.65);
-  ctx.closePath();
-  ctx.fillStyle = '#FFE000';
-  ctx.fill();
-  ctx.strokeStyle = '#1a1200';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Direction tip accent — bright white to make nose obvious
-  ctx.beginPath();
-  ctx.moveTo(SIZE, 0);
-  ctx.lineTo(SIZE * 0.35, -SIZE * 0.35);
-  ctx.lineTo(SIZE * 0.35, SIZE * 0.35);
-  ctx.closePath();
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-
-  ctx.restore();
-
-}
-
-function headingToDir(h) {
-  const dirs = ['N','NE','E','SE','S','SW','W','NW','N'];
-  return dirs[Math.round(h / 45) % 8];
-}
-
-// ════════════════════════════════════════════════
-//  COMPASS BUTTON in right panel
-// ════════════════════════════════════════════════
-(function injectCompassBtn() {
-  // Find the right panel and inject a compass toggle section
-  const rightPanel = document.querySelector('.right-panel');
-  if (!rightPanel) return;
-
-  const compassSection = document.createElement('div');
-  compassSection.className = 'ps';
-  compassSection.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
-  compassSection.innerHTML =
-    '<div class="ps-label">自機マーカー</div>' +
-    '<div style="display:flex;gap:6px;align-items:center">' +
-      '<button class="btn acc" id="btnStartMarker" style="flex:1;font-size:10px">位置・方位 ON</button>' +
-      '<div id="headingDisplay" style="font-family:var(--mono);font-size:11px;font-weight:700;color:#FFE000;min-width:60px;text-align:right">——</div>' +
-    '</div>' +
-    '<div id="markerStatus" style="font-size:8px;color:var(--txt2)">未起動</div>';
-
-  // Insert before last child
-  rightPanel.insertBefore(compassSection, rightPanel.lastElementChild);
-
-  document.getElementById('btnStartMarker').onclick = () => {
-    startGeolocation();
-    startCompass();
-    document.getElementById('btnStartMarker').textContent = '追跡中...';
-    document.getElementById('btnStartMarker').disabled = true;
-    document.getElementById('markerStatus').textContent = 'GPS・コンパス取得中';
-    document.getElementById('markerStatus').style.color = '#00d4aa';
-  };
-})();
-
-// Patch drawHeatmap to always call drawSelfMarker at the end
-(function patchDraw() {
-  const orig = drawHeatmap;
-  drawHeatmap = function() {
-    orig();
-    if (currentField) drawSelfMarker();
-    // update heading display
-    const hd = document.getElementById('headingDisplay');
-    const ms = document.getElementById('markerStatus');
-    if (hd && selfMarker.heading != null) {
-      hd.textContent = Math.round(selfMarker.heading) + '° ' + headingToDir(selfMarker.heading);
-    }
-    if (ms && selfMarker.lat != null) {
-      ms.textContent = 'GPS取得済 ±' + (selfMarker.accuracy ? Math.round(selfMarker.accuracy) + 'm' : '—');
-    }
-  };
-})();
-
-// ════════════════════════════════════════════════
-//  接続ガイドをguideに追加
-// ════════════════════════════════════════════════
-(function addConnectionGuide() {
-  const guide = document.getElementById('guide');
-  if (!guide) return;
-  guide.innerHTML =
-    '<div style="font-size:22px">🌾</div>' +
-    '<div style="font-size:11px;color:var(--txt2);line-height:1.8;text-align:center">' +
-      '① DG-PRO1RWSの電源をON<br>' +
-      '② Drogger-GPSを起動 → DGとBluetooth接続<br>' +
-      '③ AvNavを起動 → Bluetooth設定でDGを選択<br>' +
-      '④ このアプリで「接続」をタップ' +
-    '</div>';
-})();
-
-// ════════════════════════════════════════════════
-//  INIT
-// ════════════════════════════════════════════════
+// ════════════════════════════════════════════
+//  初期化
+// ════════════════════════════════════════════
 renderFieldList();
-showGuide(true);
+switchArea(AREAS[0]);
+if (areaFields().length > 0) selectField(areaFields()[0].id);
 </script>
 </body>
 </html>
