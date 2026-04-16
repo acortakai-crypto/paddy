@@ -2,528 +2,318 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Permissions-Policy" content="geolocation=*">
 <title>圃場高低差測定</title>
 <style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#080d1a;--sur:#0f1724;--sur2:#172030;--bdr:#243048;
+  --acc:#00d4aa;--acc2:#2288ff;--txt:#ddeaff;--txt2:#6a80a8;
+  --red:#ff4040;--grn:#22cc55;--ora:#ffaa00;
+  --font:"Noto Sans JP",sans-serif;--mono:"JetBrains Mono",monospace;
+}
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
-
-:root {
-  --bg: #080d1a;
-  --sur: #0f1724;
-  --sur2: #172030;
-  --bdr: #243048;
-  --acc: #00d4aa;
-  --acc2: #2288ff;
-  --txt: #ddeaff;
-  --txt2: #6a80a8;
-  --red: #ff4040;
-  --grn: #22cc55;
-  --ora: #ffaa00;
-  --font: "Noto Sans JP", sans-serif;
-  --mono: "JetBrains Mono", monospace;
-  /* panel widths for landscape phone */
-  --left-w: 200px;
-  --right-w: 220px;
-}
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html, body {
-  width: 100%; height: 100%;
-  overflow: hidden;  /* appコンテナ自体はhidden、各パネルで個別スクロール */
-  background: var(--bg);
-  color: var(--txt);
-  font-family: var(--font);
-  font-size: 13px;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+html,body{
+  width:100%;background:var(--bg);color:var(--txt);
+  font-family:var(--font);font-size:14px;
+  -webkit-tap-highlight-color:transparent;
+  overflow-x:hidden;
 }
 
-/* ═══ ROOT LAYOUT: 3 columns ═══ */
-.app {
-  display: grid;
-  grid-template-columns: var(--left-w) 1fr var(--right-w);
-  grid-template-rows: 36px 1fr;
-  width: 100vw;
-  height: 100vh;
-  min-height: 0;
-  overflow: hidden;
+/* ══ トップバー ══ */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  background:var(--sur);border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;padding:0 12px;height:44px;gap:8px;
+}
+.logo{font-weight:700;font-size:13px;color:var(--acc);}
+.logo span{color:var(--txt2);font-weight:400;}
+.badge{font-size:9px;border:1px solid rgba(0,212,170,.35);color:var(--acc);padding:1px 6px;border-radius:3px;font-family:var(--mono);}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#444;margin-left:auto;flex-shrink:0;}
+.conn-dot.on{background:var(--acc);box-shadow:0 0 6px var(--acc);}
+.conn-dot.ora{background:var(--ora);animation:blink .8s infinite;}
+@keyframes blink{50%{opacity:.2}}
+
+/* ══ ヒートマップ（画面いっぱい） ══ */
+.map-wrap{
+  position:relative;
+  width:100vw;
+  height:100vw; /* 正方形 */
+  background:#0a0e1a;
+  overflow:hidden;
+}
+#heatmap{position:absolute;top:0;left:0;display:block;}
+
+/* 4隅ボタン */
+.corner-btn{
+  position:absolute;width:52px;height:52px;
+  border-radius:50%;border:2px solid var(--acc);
+  background:rgba(0,212,170,.15);color:var(--acc);
+  font-size:10px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  text-align:center;line-height:1.2;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .15s;
+}
+.corner-btn:active{background:rgba(0,212,170,.4);}
+.corner-btn.done{background:rgba(0,212,170,.35);border-color:var(--grn);color:var(--grn);}
+.corner-tl{top:8px;left:8px;}
+.corner-tr{top:8px;right:8px;}
+.corner-bl{bottom:8px;left:8px;}
+.corner-br{bottom:8px;right:8px;}
+
+/* センターマーカー */
+.center-mark{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:24px;height:24px;pointer-events:none;
 }
 
-/* ═══ TOPBAR ═══ */
-.topbar {
-  grid-column: 1 / -1;
-  background: var(--sur);
-  border-bottom: 1px solid var(--bdr);
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  gap: 8px;
-  overflow: hidden;
+/* ステータスバー */
+.status-bar{
+  background:var(--sur);border-bottom:1px solid var(--bdr);
+  display:flex;gap:0;overflow-x:auto;
 }
-.logo {
-  font-weight: 700;
-  font-size: 12px;
-  color: var(--acc);
-  white-space: nowrap;
-  letter-spacing: 0.04em;
+.stat-item{
+  flex:1;min-width:70px;padding:8px 4px;text-align:center;
+  border-right:1px solid var(--bdr);
 }
-.logo span { color: var(--txt2); font-weight: 400; }
-.dev-badge {
-  font-family: var(--mono);
-  font-size: 9px;
-  border: 1px solid rgba(0,212,170,0.35);
-  color: var(--acc);
-  padding: 1px 6px;
-  border-radius: 3px;
-}
-.topbar-stats {
-  display: flex;
-  gap: 12px;
-  margin-left: auto;
-  align-items: center;
-}
-.tstat { text-align: center; }
-.tstat-v {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-}
-.tstat-v.hi { color: var(--red); }
-.tstat-v.lo { color: #5588ff; }
-.tstat-v.rng { color: var(--acc); }
-.tstat-l { font-size: 8px; color: var(--txt2); }
-.conn-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: #444;
-  flex-shrink: 0;
-}
-.conn-dot.on  { background: var(--acc); box-shadow: 0 0 5px var(--acc); }
-.conn-dot.ora { background: var(--ora); animation: blink .8s infinite; }
-@keyframes blink { 50%{opacity:.15} }
+.stat-item:last-child{border-right:none;}
+.stat-v{font-family:var(--mono);font-size:13px;font-weight:700;}
+.stat-l{font-size:9px;color:var(--txt2);margin-top:2px;}
 
-/* ═══ LEFT PANEL: 接続 + 圃場リスト ═══ */
-.left-panel {
-  background: var(--sur);
-  border-right: 1px solid var(--bdr);
-  display: flex;
-  flex-direction: column;
-  overflow-y: scroll;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+/* ══ コントロールパネル（スクロール領域） ══ */
+.panel{padding:16px 14px;display:flex;flex-direction:column;gap:14px;}
+
+/* セクション */
+.sec{background:var(--sur);border-radius:10px;overflow:hidden;}
+.sec-hd{
+  padding:10px 14px;font-size:11px;font-weight:700;
+  letter-spacing:.1em;color:var(--txt2);text-transform:uppercase;
+  border-bottom:1px solid var(--bdr);background:var(--sur2);
+}
+.sec-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+
+/* ボタン */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:10px 14px;border-radius:8px;border:1px solid var(--bdr);
+  background:var(--sur2);color:var(--txt);font-family:var(--font);
+  font-size:13px;cursor:pointer;transition:opacity .15s;width:100%;
+}
+.btn:active{opacity:.7;}
+.btn.acc{background:var(--acc);border-color:var(--acc);color:#000;font-weight:700;}
+.btn.red{border-color:var(--red);color:var(--red);}
+.btn.ora{background:linear-gradient(135deg,#ffaa00,#ff6600);border:none;color:#000;font-weight:700;}
+.btn.grn{background:var(--grn);border-color:var(--grn);color:#000;font-weight:700;}
+.btn:disabled{opacity:.3;pointer-events:none;}
+.btn-row{display:flex;gap:8px;}
+.btn-row .btn{flex:1;}
+
+/* GPS情報 */
+.gps-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.gps-item{background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;}
+.gps-lbl{font-size:9px;color:var(--txt2);margin-bottom:2px;}
+.gps-val{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--acc);}
+
+/* ログ */
+.nmea{
+  background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;
+  padding:8px 10px;font-family:var(--mono);font-size:10px;color:var(--txt2);
+  min-height:36px;white-space:pre-wrap;word-break:break-all;line-height:1.5;
 }
 
-/* ═══ CENTER: canvas ═══ */
-.center {
-  position: relative;
-  overflow: hidden;
-  background: var(--bg);
+/* エリアボタン */
+.area-btns{display:flex;gap:8px;}
+.area-btn{
+  flex:1;padding:10px 4px;border-radius:8px;border:1px solid var(--bdr);
+  background:var(--sur2);color:var(--txt2);font-family:var(--font);
+  font-size:14px;font-weight:700;cursor:pointer;text-align:center;
+  transition:all .15s;
 }
-#heatmap { position: absolute; top: 0; left: 0; display: block; cursor: crosshair; }
+.area-btn.active{background:var(--acc);border-color:var(--acc);color:#000;}
 
-/* ═══ RIGHT PANEL: GPS + 測定 ═══ */
-.right-panel {
-  background: var(--sur);
-  border-left: 1px solid var(--bdr);
-  display: flex;
-  flex-direction: column;
-  overflow-y: scroll;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+/* 圃場リスト */
+.field-list{display:flex;flex-direction:column;gap:8px;}
+.fc{
+  background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;
+  padding:12px 14px;cursor:pointer;transition:border-color .15s;
 }
+.fc.active{border-color:var(--acc);}
+.fc-name{font-size:14px;font-weight:700;color:var(--txt);margin-bottom:4px;}
+.fc-meta{font-size:11px;color:var(--txt2);}
 
-/* ── Panel section ── */
-.ps {
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--bdr);
+/* 基準点 */
+.ref-box{
+  background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;
+  padding:12px 14px;display:flex;align-items:center;gap:10px;
 }
-.ps-label {
-  font-size: 8px;
-  font-weight: 500;
-  letter-spacing: .12em;
-  color: var(--txt2);
-  text-transform: uppercase;
-  margin-bottom: 6px;
-}
+.ref-val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--ora);flex:1;}
 
-/* ── Buttons ── */
-.btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px 10px;
-  border-radius: 5px;
-  border: 1px solid var(--bdr);
-  background: var(--sur2);
-  color: var(--txt);
-  font-family: var(--font);
-  font-size: 11px;
-  cursor: pointer;
-  transition: border-color .15s, opacity .15s;
-  white-space: nowrap;
+/* 入力 */
+.input-row{display:flex;align-items:center;gap:8px;}
+.input-row label{font-size:12px;color:var(--txt2);white-space:nowrap;}
+input[type=number],input[type=text]{
+  background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;
+  color:var(--txt);font-size:13px;padding:8px 10px;font-family:var(--font);
 }
-.btn:active { opacity: .7; }
-.btn.acc  { background: var(--acc); border-color: var(--acc); color: #000; font-weight: 700; }
-.btn.red  { border-color: var(--red); color: var(--red); }
-.btn:disabled { opacity: .3; pointer-events: none; }
-.btn-row  { display: flex; gap: 6px; }
-.btn-row .btn { flex: 1; }
+input[type=number]{width:60px;text-align:center;}
+input[type=text]{flex:1;}
+input:focus{outline:none;border-color:var(--acc);}
 
-/* ── GPS grid ── */
-.gps-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-  margin-bottom: 6px;
-}
-.gps-item {
-  background: var(--sur2);
-  border: 1px solid var(--bdr);
-  border-radius: 5px;
-  padding: 5px 7px;
-}
-.gps-lbl { font-size: 8px; color: var(--txt2); margin-bottom: 1px; }
-.gps-val { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--acc); }
+/* オートステータス */
+.auto-status{font-size:12px;color:var(--txt2);text-align:center;padding:4px 0;}
 
-/* ── NMEA log ── */
-.nmea {
-  background: var(--sur2);
-  border: 1px solid var(--bdr);
-  border-radius: 4px;
-  padding: 4px 7px;
-  font-family: var(--mono);
-  font-size: 8px;
-  color: var(--txt2);
-  min-height: 30px;
-  max-height: 60px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin-top: 5px;
-  line-height: 1.5;
+/* モーダル */
+.modal-ov{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:200;align-items:center;justify-content:center;padding:20px;
 }
+.modal{
+  background:var(--sur);border:1px solid var(--bdr);border-radius:12px;
+  padding:20px;width:100%;max-width:360px;
+}
+.modal h3{font-size:16px;margin-bottom:16px;color:var(--acc);}
+.fg{margin-bottom:12px;}
+.fg label{display:block;font-size:11px;color:var(--txt2);margin-bottom:4px;}
+.fg input{width:100%;}
+.modal-act{display:flex;gap:8px;margin-top:16px;}
+.modal-act .btn{flex:1;}
 
-/* ── Center ref display ── */
-.center-ref {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--sur2);
-  border: 1px solid var(--bdr);
-  border-radius: 5px;
-  padding: 5px 8px;
-  margin-bottom: 6px;
+/* legend */
+.legend-wrap{
+  display:flex;align-items:center;gap:8px;padding:0 4px;
 }
-.center-ref-val {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ora);
-  flex: 1;
+.legend-bar{
+  flex:1;height:10px;border-radius:5px;
+  background:linear-gradient(to right,#1e64ff,#22c837,#dc2b2b);
 }
-
-/* ── MEASURE big button ── */
-.measure-btn {
-  width: 100%;
-  padding: 10px 8px;
-  border-radius: 7px;
-  border: none;
-  background: linear-gradient(135deg, var(--acc), var(--acc2));
-  color: #000;
-  font-family: var(--font);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  letter-spacing: .03em;
-  transition: opacity .2s;
-  line-height: 1.3;
-}
-.measure-btn:active { opacity: .75; }
-.measure-btn:disabled { opacity: .3; pointer-events: none; }
-
-/* ── 右パネル末尾の余白（スクロール末端の見切れ防止） ── */
-.right-panel > .ps:last-child {
-  padding-bottom: 16px;
-}
-
-/* ── Field list ── */
-.field-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.field-list::-webkit-scrollbar { width: 3px; }
-.field-list::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 2px; }
-
-.fc {
-  background: var(--sur2);
-  border: 1px solid var(--bdr);
-  border-radius: 6px;
-  padding: 7px 8px;
-  cursor: pointer;
-  position: relative;
-  transition: border-color .15s;
-}
-.fc:active { opacity: .8; }
-.fc.active { border-color: var(--acc); }
-.fc-name { font-size: 11px; font-weight: 500; padding-right: 18px; margin-bottom: 2px; }
-.fc-meta { font-size: 9px; color: var(--txt2); }
-.fc-rng  { font-family: var(--mono); font-size: 9px; color: var(--acc); margin-top: 1px; }
-.fc-del {
-  position: absolute; top: 5px; right: 5px;
-  background: none; border: none; color: var(--txt2);
-  font-size: 11px; cursor: pointer; padding: 2px 4px;
-  border-radius: 3px;
-}
-.fc-del:hover { color: var(--red); }
-
-/* ── New field / baud row ── */
-.mini-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 5px;
-}
-.mini-row label { font-size: 9px; color: var(--txt2); white-space: nowrap; }
-.mini-input {
-  flex: 1;
-  padding: 5px 7px;
-  background: var(--sur2);
-  border: 1px solid var(--bdr);
-  border-radius: 4px;
-  color: var(--txt);
-  font-family: var(--mono);
-  font-size: 11px;
-  outline: none;
-}
-.mini-input:focus { border-color: var(--acc); }
-
-/* ── Legend ── */
-.legend {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(10,16,30,0.88);
-  border: 1px solid var(--bdr);
-  border-radius: 6px;
-  padding: 7px 12px;
-  text-align: center;
-  pointer-events: none;
-}
-.legend-bar {
-  width: 140px;
-  height: 8px;
-  border-radius: 4px;
-  background: linear-gradient(to right, #1e64ff, #22c850, #dc2828);
-  margin: 4px 0;
-}
-.legend-labels {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--mono);
-  font-size: 9px;
-}
-.legend-labels span:first-child { color: #5588ff; }
-.legend-labels span:last-child  { color: var(--red); }
-.legend-labels span:nth-child(2){ color: var(--grn); }
-
-/* ── Tooltip ── */
-.tooltip {
-  position: absolute;
-  background: var(--sur);
-  border: 1px solid var(--bdr);
-  border-radius: 5px;
-  padding: 5px 9px;
-  font-size: 11px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity .12s;
-  z-index: 10;
-  white-space: nowrap;
-}
-.tooltip.show { opacity: 1; }
-
-/* ── Guide ── */
-.guide {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  flex-direction: column; gap: 8px;
-  color: var(--txt2); font-size: 12px;
-  pointer-events: none; text-align: center;
-}
-
-/* ── Modal ── */
-.modal-ov {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.75); z-index: 200;
-  align-items: center; justify-content: center;
-}
-.modal-ov.open { display: flex; }
-.modal {
-  background: var(--sur);
-  border: 1px solid var(--bdr);
-  border-radius: 10px;
-  padding: 20px;
-  width: 320px;
-  max-width: 90vw;
-}
-.modal h3 { font-size: 14px; font-weight: 500; margin-bottom: 12px; }
-.fg { margin-bottom: 10px; }
-.fg label { font-size: 10px; color: var(--txt2); display: block; margin-bottom: 4px; }
-.fg input {
-  width: 100%;
-  padding: 8px 10px;
-  background: var(--sur2);
-  border: 1px solid var(--bdr);
-  border-radius: 5px;
-  color: var(--txt);
-  font-family: var(--font);
-  font-size: 12px;
-  outline: none;
-}
-.fg input:focus { border-color: var(--acc); }
-.modal-act { display: flex; gap: 8px; margin-top: 14px; }
-.modal-act .btn { flex: 1; padding: 8px; font-size: 12px; }
-
-/* ── Empty state ── */
-.empty {
-  text-align: center; color: var(--txt2);
-  font-size: 10px; padding: 16px 8px; line-height: 1.8;
-}
+.legend-labels{display:flex;justify-content:space-between;font-size:10px;margin-top:2px;}
+.legend-labels span{font-family:var(--mono);}
 </style>
 </head>
 <body>
 
-<div class="app">
+<!-- トップバー -->
+<div class="topbar">
+  <div class="logo">田んぼ高低差 <span>SURVEY</span></div>
+  <div class="badge">DG-PRO1RWS</div>
+  <div class="conn-dot" id="connDot"></div>
+</div>
 
-  <!-- TOPBAR -->
-  <div class="topbar">
-    <div class="logo">田んぼ高低差 <span>SURVEY</span></div>
-    <div class="dev-badge">DG-PRO1RWS</div>
-    <div class="topbar-stats" id="statsRow" style="display:none">
-      <div class="tstat"><div class="tstat-v hi" id="statHi">—</div><div class="tstat-l">最高(cm)</div></div>
-      <div class="tstat"><div class="tstat-v lo" id="statLo">—</div><div class="tstat-l">最低(cm)</div></div>
-      <div class="tstat"><div class="tstat-v rng" id="statRange">—</div><div class="tstat-l">高低差(cm)</div></div>
-      <div class="tstat"><div class="tstat-v" id="statPoints" style="color:var(--txt2)">—</div><div class="tstat-l">測定点</div></div>
-    </div>
-    <div class="conn-dot" id="connDot" style="margin-left:auto"></div>
-  </div>
+<!-- ヒートマップ（画面いっぱい正方形） -->
+<div class="map-wrap" id="mapWrap">
+  <canvas id="heatmap"></canvas>
+  <!-- 4隅ボタン -->
+  <button class="corner-btn corner-tl" id="cornerTL" disabled>左上<br>記録</button>
+  <button class="corner-btn corner-tr" id="cornerTR" disabled>右上<br>記録</button>
+  <button class="corner-btn corner-bl" id="cornerBL" disabled>左下<br>記録</button>
+  <button class="corner-btn corner-br" id="cornerBR" disabled>右下<br>記録</button>
+  <!-- センターマーカー -->
+  <svg class="center-mark" id="centerMark" style="display:none" viewBox="0 0 24 24">
+    <line x1="12" y1="2" x2="12" y2="22" stroke="#ffaa00" stroke-width="2"/>
+    <line x1="2" y1="12" x2="22" y2="12" stroke="#ffaa00" stroke-width="2"/>
+    <circle cx="12" cy="12" r="3" fill="#ffaa00"/>
+  </svg>
+</div>
 
-  <!-- LEFT PANEL -->
-  <div class="left-panel">
+<!-- ステータスバー -->
+<div class="status-bar" id="statusBar" style="display:none">
+  <div class="stat-item"><div class="stat-v" style="color:var(--red)" id="statHi">—</div><div class="stat-l">最高(cm)</div></div>
+  <div class="stat-item"><div class="stat-v" style="color:#5588ff" id="statLo">—</div><div class="stat-l">最低(cm)</div></div>
+  <div class="stat-item"><div class="stat-v" style="color:var(--acc)" id="statRange">—</div><div class="stat-l">高低差(cm)</div></div>
+  <div class="stat-item"><div class="stat-v" style="color:var(--txt2)" id="statPoints">—</div><div class="stat-l">測定点</div></div>
+</div>
 
-    <!-- 接続 -->
-    <div class="ps">
-      <div class="ps-label">エリア選択</div>
-      <div class="btn-row" id="areaBtns" style="margin-bottom:6px">
-        <button class="btn" id="areaBtn0" onclick="switchArea('白根')">白根</button>
-        <button class="btn" id="areaBtn1" onclick="switchArea('潟東')">潟東</button>
-        <button class="btn" id="areaBtn2" onclick="switchArea('金巻')">金巻</button>
-      </div>
-      <div class="ps-label">DG-PRO1RWS <span id="fieldCount" style="color:var(--acc)">0</span>圃場</div>
-      <div class="btn-row" style="margin-bottom:5px">
+<!-- スクロール領域 -->
+<div class="panel">
+
+  <!-- GPS接続 -->
+  <div class="sec">
+    <div class="sec-hd">GPS接続</div>
+    <div class="sec-body">
+      <div class="btn-row">
         <button class="btn acc" id="btnConnect">GPS接続</button>
         <button class="btn" id="btnDisconnect" disabled>切断</button>
       </div>
-      <div style="font-size:8px;color:var(--txt2);margin-bottom:5px;line-height:1.6">
-        ①Drogger-GPS起動→DG接続<br>②モックプロバイダーON<br>③「GPS接続」をタップ
-      </div>
       <div class="nmea" id="nmeaLog">待機中...</div>
-    </div>
-
-    <!-- グリッド設定 + 新規 -->
-    <div class="ps">
-      <div class="ps-label">新規圃場</div>
-      <div class="mini-row">
-        <label>X</label>
-        <input type="number" id="gridX" class="mini-input" value="5" min="1" max="30" style="width:44px;flex:none">
-        <label>Y</label>
-        <input type="number" id="gridY" class="mini-input" value="4" min="1" max="30" style="width:44px;flex:none">
-        <button class="btn acc" id="btnNewField" style="flex:1">＋作成</button>
-      </div>
-    </div>
-
-    <!-- 圃場リスト -->
-    <div class="field-list" id="fieldList">
-      <div class="empty">圃場がありません</div>
-    </div>
-  </div>
-
-  <!-- CENTER -->
-  <div class="center">
-    <canvas id="heatmap"></canvas>
-    <div class="guide" id="guide">
-      <div style="font-size:24px">🌾</div>
-      <div>圃場を選択または作成</div>
-    </div>
-    <div class="tooltip" id="tooltip"></div>
-    <div class="legend" id="legend" style="display:none">
-      <div style="font-size:8px;color:var(--txt2);letter-spacing:.1em">高低差 (cm)</div>
-      <div class="legend-bar"></div>
-      <div class="legend-labels">
-        <span id="legLo">—</span>
-        <span style="color:var(--grn)">基準 0</span>
-        <span id="legHi">—</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- RIGHT PANEL -->
-  <div class="right-panel">
-
-    <!-- GPS -->
-    <div class="ps">
-      <div class="ps-label">現在GPS</div>
       <div class="gps-grid">
         <div class="gps-item"><div class="gps-lbl">標高(m)</div><div class="gps-val" id="gpsAlt">—</div></div>
-        <div class="gps-item"><div class="gps-lbl">HDOP</div><div class="gps-val" id="gpsHdop">—</div></div>
+        <div class="gps-item"><div class="gps-lbl">精度(m)</div><div class="gps-val" id="gpsAcc">—</div></div>
         <div class="gps-item"><div class="gps-lbl">衛星数</div><div class="gps-val" id="gpsSat">—</div></div>
         <div class="gps-item"><div class="gps-lbl">Fix</div><div class="gps-val" id="gpsFix">—</div></div>
       </div>
     </div>
-
-    <!-- センター基準 -->
-    <div class="ps">
-      <div class="ps-label">センター基準点</div>
-      <div class="center-ref">
-        <div style="font-size:9px;color:var(--txt2);line-height:1.3">基準<br>高度</div>
-        <div class="center-ref-val" id="centerAltDisplay">未記録</div>
-        <button class="btn red" id="btnResetCenter" style="padding:4px 7px;font-size:9px">リセット</button>
-      </div>
-      <button class="measure-btn" id="btnMeasure" disabled>🎯 ここを基準点に設定</button>
-      <div style="font-size:8px;color:var(--txt2);margin-top:5px;line-height:1.5" id="autoRecordStatus">
-        基準点設定後は走行するだけで自動記録
-      </div>
-    </div>
-
-    <!-- フィールド名 -->
-    <div class="ps" style="flex:1;overflow:hidden">
-      <div class="ps-label" id="mainTitle" style="font-size:10px;color:var(--txt);text-transform:none;letter-spacing:0;margin:0">圃場未選択</div>
-    </div>
-
   </div>
+
+  <!-- エリア選択 -->
+  <div class="sec">
+    <div class="sec-hd">エリア選択</div>
+    <div class="sec-body">
+      <div class="area-btns" id="areaBtns">
+        <div class="area-btn active" onclick="switchArea('白根')">白根</div>
+        <div class="area-btn" onclick="switchArea('潟東')">潟東</div>
+        <div class="area-btn" onclick="switchArea('金巻')">金巻</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 圃場管理 -->
+  <div class="sec">
+    <div class="sec-hd">圃場 <span id="fieldCount" style="color:var(--acc)">0</span>枚</div>
+    <div class="sec-body">
+      <div class="input-row">
+        <label>X</label>
+        <input type="number" id="gridX" value="5" min="1" max="30">
+        <label>Y</label>
+        <input type="number" id="gridY" value="4" min="1" max="30">
+        <button class="btn acc" id="btnNewField" style="flex:1">＋新規作成</button>
+      </div>
+      <div class="field-list" id="fieldList">
+        <div style="font-size:12px;color:var(--txt2);padding:4px">圃場がありません</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 選択中圃場の測定（圃場選択後に表示） -->
+  <div class="sec" id="measureSec" style="display:none">
+    <div class="sec-hd" id="mainTitle">圃場名</div>
+    <div class="sec-body">
+      <!-- 基準点 -->
+      <div class="ref-box">
+        <div style="font-size:11px;color:var(--txt2);line-height:1.4">センター<br>基準高度</div>
+        <div class="ref-val" id="centerAltDisplay">未記録</div>
+        <button class="btn red" id="btnResetCenter" style="width:auto;padding:6px 10px;font-size:11px">リセット</button>
+      </div>
+      <button class="btn ora" id="btnMeasure" disabled>🎯 ここを基準点に設定</button>
+      <div class="auto-status" id="autoRecordStatus">基準点設定後は走行するだけで自動記録</div>
+      <!-- legend -->
+      <div>
+        <div class="legend-wrap">
+          <span style="font-size:10px;color:var(--txt2)">低</span>
+          <div class="legend-bar"></div>
+          <span style="font-size:10px;color:var(--txt2)">高</span>
+        </div>
+        <div class="legend-labels" id="legendLabels" style="display:none">
+          <span id="legLo" style="color:#5588ff">—</span>
+          <span style="color:var(--grn)">基準 0</span>
+          <span id="legHi" style="color:var(--red)">—</span>
+        </div>
+      </div>
+      <!-- 測定終了 -->
+      <button class="btn red" id="btnEndMeasure" style="margin-top:4px">■ 測定終了（圃場選択に戻る）</button>
+    </div>
+  </div>
+
 </div>
 
-<!-- Modal -->
+<!-- モーダル -->
 <div class="modal-ov" id="modalOverlay">
   <div class="modal">
     <h3>新規圃場を作成</h3>
-    <div class="fg">
-      <label>圃場名</label>
-      <input id="fieldNameInput" placeholder="例: 第1圃場">
-    </div>
-    <div class="fg">
-      <label>メモ（任意）</label>
-      <input id="fieldNoteInput" placeholder="例: 北側 30a">
-    </div>
+    <div class="fg"><label>圃場名</label><input type="text" id="fieldNameInput" placeholder="例: 第1圃場"></div>
+    <div class="fg"><label>メモ（任意）</label><input type="text" id="fieldNoteInput" placeholder="例: 北側 30a"></div>
     <div class="modal-act">
       <button class="btn" id="btnModalCancel">キャンセル</button>
       <button class="btn acc" id="btnModalCreate">作成</button>
@@ -532,9 +322,8 @@ html, body {
 </div>
 
 <script>
-
 // ════════════════════════════════════════════
-//  DB (localStorage)
+//  DB
 // ════════════════════════════════════════════
 const AREAS = ['白根', '潟東', '金巻'];
 let currentArea = AREAS[0];
@@ -546,7 +335,6 @@ function loadDB() {
     if (saved && saved['白根']) {
       db = saved;
     } else {
-      // 旧データがあれば白根に移行
       const old = JSON.parse(localStorage.getItem('paddyDB') || '{"fields":[]}');
       db['白根'].fields = old.fields || [];
     }
@@ -567,7 +355,7 @@ let gpsData = { lat:null, lon:null, alt:null, accuracy:null };
 document.getElementById('btnConnect').onclick = () => {
   if (!navigator.geolocation) { alert('Geolocation未対応です'); return; }
   if (location.protocol === 'file:') {
-    document.getElementById('nmeaLog').textContent = '⚠ file://では動きません。GitHub Pages経由で開いてください。';
+    logNMEA('⚠ file://では動きません。\nGitHub Pages経由で開いてください。');
     return;
   }
   logNMEA('GPS接続中...');
@@ -578,21 +366,22 @@ document.getElementById('btnConnect').onclick = () => {
       gpsData.alt      = pos.coords.altitude;
       gpsData.accuracy = pos.coords.accuracy;
       setConnected(true);
-      const alt = gpsData.alt != null ? gpsData.alt.toFixed(3)+'m' : '--';
+      const alt = gpsData.alt      != null ? gpsData.alt.toFixed(3)+'m'      : '--';
       const acc = gpsData.accuracy != null ? gpsData.accuracy.toFixed(3)+'m' : '--';
       logNMEA('lat:'+gpsData.lat.toFixed(7)+'\nalt:'+alt+' acc:'+acc);
-      document.getElementById('gpsAlt').textContent  = gpsData.alt  != null ? gpsData.alt.toFixed(3)  : '—';
-      document.getElementById('gpsSat').textContent  = '—';
-      document.getElementById('gpsHdop').textContent = '—';
-      document.getElementById('gpsFix').textContent  = gpsData.accuracy != null && gpsData.accuracy < 0.1 ? 'RTK' : 'GPS';
-      document.getElementById('gpsFix').style.color  = gpsData.accuracy != null && gpsData.accuracy < 0.1 ? '#00ff88' : '#ffaa00';
+      document.getElementById('gpsAlt').textContent = gpsData.alt      != null ? gpsData.alt.toFixed(3)      : '—';
+      document.getElementById('gpsAcc').textContent = gpsData.accuracy != null ? gpsData.accuracy.toFixed(3) : '—';
+      document.getElementById('gpsSat').textContent = '—';
+      const isRTK = gpsData.accuracy != null && gpsData.accuracy < 0.1;
+      document.getElementById('gpsFix').textContent = isRTK ? 'RTK' : 'GPS';
+      document.getElementById('gpsFix').style.color  = isRTK ? '#00ff88' : '#ffaa00';
       tryAutoRecord();
     },
     err => {
       let msg = '';
       if (err.code === 1) { msg = '位置情報の許可が必要です'; alert(msg); }
-      else if (err.code === 2) msg = 'GPS信号なし。Drogger-GPSの接続を確認。';
-      else if (err.code === 3) msg = 'タイムアウト。屋外で試してください。';
+      else if (err.code === 2) msg = 'GPS信号なし。\nDrogger-GPSの接続を確認。';
+      else if (err.code === 3) msg = 'タイムアウト。\n屋外で試してください。';
       else msg = 'エラー: ' + err.message;
       logNMEA(msg); setConnected(false);
     },
@@ -610,6 +399,9 @@ function setConnected(v) {
   document.getElementById('btnConnect').disabled    = v;
   document.getElementById('btnDisconnect').disabled = !v;
   document.getElementById('btnMeasure').disabled    = !v;
+  ['cornerTL','cornerTR','cornerBL','cornerBR'].forEach(id => {
+    document.getElementById(id).disabled = !v || !currentField || currentField.centerAlt == null;
+  });
 }
 
 function logNMEA(msg) {
@@ -618,24 +410,29 @@ function logNMEA(msg) {
 }
 
 // ════════════════════════════════════════════
-//  圃場管理
+//  エリア切替
 // ════════════════════════════════════════════
-let currentField = null;
-
 function switchArea(area) {
   currentArea = area;
   currentField = null;
-  showGuide(true);
   renderFieldList();
   drawHeatmap();
-  // ボタンのハイライト更新
-  AREAS.forEach((a,i) => {
-    const btn = document.getElementById('areaBtn'+i);
-    if (btn) btn.className = 'btn' + (a===currentArea ? ' acc' : '');
+  document.getElementById('mainTitle').textContent = '圃場を選択してください';
+  document.getElementById('centerAltDisplay').textContent = '未記録';
+  document.getElementById('centerAltDisplay').style.color = '#ffaa00';
+  document.getElementById('statusBar').style.display = 'none';
+  document.getElementById('centerMark').style.display = 'none';
+  document.getElementById('measureSec').style.display = 'none';
+  AREAS.forEach(a => {
+    const btns = document.querySelectorAll('.area-btn');
+    btns.forEach(b => { b.className = 'area-btn' + (b.textContent === currentArea ? ' active' : ''); });
   });
 }
-// 初期ハイライト
-setTimeout(() => switchArea(AREAS[0]), 0);
+
+// ════════════════════════════════════════════
+//  圃場管理
+// ════════════════════════════════════════════
+let currentField = null;
 
 document.getElementById('btnNewField').onclick = () => {
   document.getElementById('modalOverlay').style.display = 'flex';
@@ -653,11 +450,9 @@ document.getElementById('btnModalCreate').onclick = () => {
   const gy = Math.max(1, Math.min(30, parseInt(document.getElementById('gridY').value) || 4));
   const field = {
     id: Date.now(),
-    name,
-    note: document.getElementById('fieldNoteInput').value.trim(),
-    gridX: gx, gridY: gy,
-    centerAlt: null,
-    points: [],
+    name, note: document.getElementById('fieldNoteInput').value.trim(),
+    gridX:gx, gridY:gy, centerAlt:null, points:[],
+    corners: { tl:null, tr:null, bl:null, br:null },
     created: new Date().toLocaleDateString('ja-JP')
   };
   areaFields().push(field);
@@ -670,15 +465,20 @@ document.getElementById('btnModalCreate').onclick = () => {
 function renderFieldList() {
   const list = document.getElementById('fieldList');
   document.getElementById('fieldCount').textContent = areaFields().length;
-  if (!areaFields().length) { list.innerHTML = '<div style="font-size:9px;color:#6a80a8;padding:4px">圃場がありません</div>'; return; }
+  if (!areaFields().length) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--txt2);padding:4px">圃場がありません</div>';
+    return;
+  }
   list.innerHTML = areaFields().map(f => {
-    const pts = (f.points||[]).filter(p=>!p.extra).length;
+    const pts = (f.points||[]).length;
     const active = currentField && currentField.id === f.id;
+    const corners = f.corners || {};
+    const cornersStr = ['tl','tr','bl','br'].map(k => corners[k] ? '●' : '○').join('');
     return `<div class="fc${active?' active':''}" data-id="${f.id}">
-      <div class="fc-name">${f.name}</div>
-      <div class="fc-meta">${f.created||''} ${pts}点</div>
-      ${f.centerAlt!=null?'<div class="fc-meta" style="color:#00d4aa">基準:'+f.centerAlt.toFixed(3)+'m</div>':''}
-      <button class="btn red" data-del="${f.id}" style="padding:2px 6px;font-size:8px;margin-top:2px">削除</button>
+      <div class="fc-name">${f.name}${f.note?' <span style="font-weight:400;font-size:11px;color:var(--txt2)">'+f.note+'</span>':''}</div>
+      <div class="fc-meta">${f.created||''} / ${pts}点 / 4隅:${cornersStr}</div>
+      ${f.centerAlt!=null?'<div class="fc-meta" style="color:var(--acc)">基準:'+f.centerAlt.toFixed(3)+'m</div>':''}
+      <button class="btn red" data-del="${f.id}" style="margin-top:6px;padding:5px 10px;font-size:11px">削除</button>
     </div>`;
   }).join('');
   list.querySelectorAll('.fc').forEach(card => {
@@ -690,7 +490,12 @@ function renderFieldList() {
       if (!confirm('削除しますか？')) return;
       db[currentArea].fields = areaFields().filter(f => f.id !== parseInt(btn.dataset.del));
       saveDB();
-      if (currentField && currentField.id === parseInt(btn.dataset.del)) { currentField = null; showGuide(true); }
+      if (currentField && currentField.id === parseInt(btn.dataset.del)) {
+        currentField = null;
+        drawHeatmap();
+        document.getElementById('statusBar').style.display = 'none';
+        document.getElementById('centerMark').style.display = 'none';
+      }
       renderFieldList();
     });
   });
@@ -700,29 +505,50 @@ function selectField(id) {
   autoRecording = false;
   currentField = areaFields().find(f => f.id === id);
   if (!currentField) return;
+  if (!currentField.corners) currentField.corners = {tl:null,tr:null,bl:null,br:null};
   renderFieldList();
-  showGuide(false);
   document.getElementById('mainTitle').textContent = currentField.name + (currentField.note ? ' — '+currentField.note : '');
+  document.getElementById('measureSec').style.display = 'block';
   updateMeasureLabel();
+  updateCornerBtns();
   drawHeatmap();
   const status = document.getElementById('autoRecordStatus');
-  if (status) {
-    if (currentField.centerAlt != null) {
-      status.textContent = '⏸ 基準点を再設定で再開';
-      status.style.color = 'var(--txt2)';
-    } else {
-      status.textContent = '基準点設定後は走行するだけで自動記録';
-      status.style.color = 'var(--txt2)';
-    }
+  if (currentField.centerAlt != null) {
+    status.textContent = '⏸ 基準点を再設定で再開';
+    status.style.color = 'var(--txt2)';
+  } else {
+    status.textContent = '基準点設定後は走行するだけで自動記録';
+    status.style.color = 'var(--txt2)';
   }
+  // 測定セクションまでスクロール
+  setTimeout(() => document.getElementById('measureSec').scrollIntoView({behavior:'smooth', block:'start'}), 150);
 }
 
-function showGuide(v) {
-  document.getElementById('guide').style.display     = v ? 'flex' : 'none';
-  document.getElementById('legend').style.display    = v ? 'none' : 'block';
-  document.getElementById('statsRow').style.display  = v ? 'none' : 'flex';
-  document.getElementById('mainTitle').textContent   = v ? '圃場を選択してください' : (currentField?.name||'');
+// ════════════════════════════════════════════
+//  4隅記録
+// ════════════════════════════════════════════
+function updateCornerBtns() {
+  const corners = currentField ? (currentField.corners || {}) : {};
+  const connected = !document.getElementById('btnConnect').disabled === false;
+  ['tl','tr','bl','br'].forEach((k,i) => {
+    const ids = ['cornerTL','cornerTR','cornerBL','cornerBR'];
+    const btn = document.getElementById(ids[i]);
+    const labels = ['左上','右上','左下','右下'];
+    btn.className = 'corner-btn corner-'+['tl','tr','bl','br'][i] + (corners[k] ? ' done' : '');
+    btn.innerHTML = labels[i]+'<br>'+(corners[k] ? '✓' : '記録');
+    btn.disabled = !currentField || currentField.centerAlt == null || gpsData.alt == null;
+  });
 }
+
+['TL','TR','BL','BR'].forEach(pos => {
+  document.getElementById('corner'+pos).onclick = () => {
+    if (!currentField || gpsData.alt == null) return;
+    if (!currentField.corners) currentField.corners = {tl:null,tr:null,bl:null,br:null};
+    const key = pos.toLowerCase();
+    currentField.corners[key] = { alt:gpsData.alt, lat:gpsData.lat, lon:gpsData.lon };
+    saveDB(); updateCornerBtns(); renderFieldList(); drawHeatmap();
+  };
+});
 
 // ════════════════════════════════════════════
 //  基準点 & 自動記録
@@ -736,12 +562,11 @@ document.getElementById('btnMeasure').onclick = () => {
   currentField.centerAlt = gpsData.alt;
   currentField.points    = [];
   autoRecording          = true;
-  saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel();
+  saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel(); updateCornerBtns();
+  document.getElementById('centerMark').style.display = 'block';
   const status = document.getElementById('autoRecordStatus');
-  if (status) { status.textContent = '🟢 自動記録中 — 走行するだけで記録されます'; status.style.color = 'var(--acc)'; }
-  const btn = document.getElementById('btnMeasure');
-  btn.textContent = '✓ 基準点設定 — 自動記録開始';
-  setTimeout(() => updateMeasureLabel(), 1200);
+  status.textContent = '🟢 自動記録中 — 走行するだけで記録されます';
+  status.style.color = 'var(--acc)';
 };
 
 document.getElementById('btnResetCenter').onclick = () => {
@@ -750,18 +575,23 @@ document.getElementById('btnResetCenter').onclick = () => {
   currentField.centerAlt = null;
   currentField.points    = [];
   autoRecording          = false;
-  saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel();
+  saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel(); updateCornerBtns();
+  document.getElementById('centerMark').style.display = 'none';
+  document.getElementById('statusBar').style.display = 'none';
 };
 
 function updateMeasureLabel() {
   const btn = document.getElementById('btnMeasure');
+  const el  = document.getElementById('centerAltDisplay');
   if (!currentField) return;
   if (currentField.centerAlt == null) {
     btn.textContent = '🎯 ここを基準点に設定';
-    btn.style.background = 'linear-gradient(135deg,#ffaa00,#ff6600)';
+    btn.className   = 'btn ora';
+    if (el) { el.textContent = '未記録'; el.style.color = '#ffaa00'; }
   } else {
     btn.textContent = '🔄 基準点を再設定';
-    btn.style.background = 'linear-gradient(135deg,#555,#333)';
+    btn.className   = 'btn';
+    if (el) { el.textContent = currentField.centerAlt.toFixed(4)+' m'; el.style.color = '#22c850'; }
   }
 }
 
@@ -771,34 +601,36 @@ function tryAutoRecord() {
   const now = Date.now();
   if (now - lastAutoRecordTime < 2000) return;
   lastAutoRecordTime = now;
-  currentField.points.push({ alt:gpsData.alt, lat:gpsData.lat, lon:gpsData.lon, row:-1, col:-1 });
+  currentField.points.push({ alt:gpsData.alt, lat:gpsData.lat, lon:gpsData.lon });
   saveDB(); drawHeatmap(); renderFieldList();
   const status = document.getElementById('autoRecordStatus');
   if (status) { status.textContent = '🟢 自動記録中 '+currentField.points.length+'点'; status.style.color = 'var(--acc)'; }
 }
 
 // ════════════════════════════════════════════
-//  ヒートマップ描画（正方形1枚）
+//  ヒートマップ（縦画面正方形）
 // ════════════════════════════════════════════
 const canvas = document.getElementById('heatmap');
 const ctx    = canvas.getContext('2d');
 
 function resizeCanvas() {
-  const W = Math.max(window.innerWidth - 200 - 220, 100);
-  const H = Math.max(window.innerHeight - 36, 100);
-  canvas.width  = W; canvas.height = H;
-  canvas.style.width  = W+'px'; canvas.style.height = H+'px';
+  const size = window.innerWidth;
+  canvas.width  = size;
+  canvas.height = size;
+  canvas.style.width  = size+'px';
+  canvas.style.height = size+'px';
+  document.getElementById('mapWrap').style.height = size+'px';
 }
 window.addEventListener('resize', () => { resizeCanvas(); drawHeatmap(); });
 window.addEventListener('orientationchange', () => { setTimeout(()=>{ resizeCanvas(); drawHeatmap(); }, 300); });
 resizeCanvas();
 
-function idw(known, px, py, power) {
+function idw(known, px, py) {
   let num=0, den=0;
   for (const k of known) {
     const d = Math.sqrt((k.px-px)**2+(k.py-py)**2);
     if (d < 0.001) return k.alt;
-    const w = 1/(d**power); num+=w*k.alt; den+=w;
+    const w = 1/d**2; num+=w*k.alt; den+=w;
   }
   return den===0 ? known[0].alt : num/den;
 }
@@ -810,33 +642,35 @@ function altColor(t) {
 }
 
 function drawHeatmap() {
-  if (!currentField) return;
-  const W = Math.max(window.innerWidth - 200 - 220, 100);
-  const H = Math.max(window.innerHeight - 36, 100);
-  canvas.width  = W; canvas.height = H;
-  canvas.style.width  = W+'px'; canvas.style.height = H+'px';
-  ctx.clearRect(0, 0, W, H);
+  const size = canvas.width || window.innerWidth;
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = '#0a0e1a';
+  ctx.fillRect(0, 0, size, size);
 
-  // 基準点未設定
-  const centerEl = document.getElementById('centerAltDisplay');
-  if (currentField.centerAlt == null) {
-    if (centerEl) { centerEl.textContent='未記録'; centerEl.style.color='#ffaa00'; }
-    updateMeasureLabel();
-    ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.font='13px sans-serif';
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('GPS接続して基準点を設定 → 走行で自動記録', W/2, H/2);
-    document.getElementById('statsRow').style.display='none';
+  if (!currentField) {
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = '15px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('圃場を選択してください', size/2, size/2);
     return;
   }
-  if (centerEl) { centerEl.textContent=currentField.centerAlt.toFixed(4)+' m'; centerEl.style.color='#22c850'; }
-  updateMeasureLabel();
 
-  const measured = (currentField.points||[]);
+  if (currentField.centerAlt == null) {
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = '15px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('基準点を設定してください', size/2, size/2);
+    document.getElementById('statusBar').style.display = 'none';
+    return;
+  }
+
+  const measured = currentField.points || [];
   if (measured.length === 0) {
-    ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.font='13px sans-serif';
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('走行して測定点を記録してください', W/2, H/2);
-    document.getElementById('statsRow').style.display='none';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = '15px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('走行して測定点を記録してください', size/2, size/2);
+    document.getElementById('statusBar').style.display = 'none';
     return;
   }
 
@@ -847,7 +681,7 @@ function drawHeatmap() {
   const spread= maxDev*2;
 
   // stats
-  document.getElementById('statsRow').style.display='flex';
+  document.getElementById('statusBar').style.display = 'flex';
   const hiCm=(altMax-altCenter)*100, loCm=(altMin-altCenter)*100;
   document.getElementById('statHi').textContent    = (hiCm>=0?'+':'')+hiCm.toFixed(1);
   document.getElementById('statLo').textContent    = (loCm>=0?'+':'')+loCm.toFixed(1);
@@ -855,12 +689,12 @@ function drawHeatmap() {
   document.getElementById('statPoints').textContent= measured.length+'点';
   document.getElementById('legHi').textContent = (hiCm>=0?'+':'')+hiCm.toFixed(1)+' cm';
   document.getElementById('legLo').textContent = (loCm>=0?'+':'')+loCm.toFixed(1)+' cm';
+  document.getElementById('legendLabels').style.display = 'flex';
 
-  // 正方形
-  const pad  = 20;
-  const size = Math.min(W,H) - pad*2;
-  const ox   = (W-size)/2;
-  const oy   = (H-size)/2;
+  // 描画エリア（4隅ボタン分のpadding）
+  const pad = 68;
+  const plotSize = size - pad*2;
+  const ox = pad, oy = pad;
 
   // 既知点をcanvas座標に変換
   const lats = measured.filter(p=>p.lat!=null).map(p=>p.lat);
@@ -868,23 +702,27 @@ function drawHeatmap() {
   let known;
   if (lats.length >= 2) {
     const latMax2=Math.max(...lats),latMin2=Math.min(...lats);
-    const lonMax2=Math.max(...lons),lonMin2=Math.min(...lons);
+    const lonMin2=Math.min(...lons),lonMax2=Math.max(...lons);
     const latR=Math.max(latMax2-latMin2,0.00001), lonR=Math.max(lonMax2-lonMin2,0.00001);
     known = measured.filter(p=>p.lat!=null).map(p=>({
-      px: ox+((p.lon-lonMin2)/lonR)*size,
-      py: oy+((latMax2-p.lat)/latR)*size,
+      px: ox+((p.lon-lonMin2)/lonR)*plotSize,
+      py: oy+((latMax2-p.lat)/latR)*plotSize,
       alt: p.alt
     }));
   } else {
-    known = measured.map((p,i)=>({ px: ox+(i/(measured.length-1||1))*size, py: H/2, alt:p.alt }));
+    known = measured.map((p,i)=>({
+      px: ox+(i/(measured.length-1||1))*plotSize,
+      py: size/2,
+      alt: p.alt
+    }));
   }
 
   // IDW補間
-  const res=4, cols=Math.ceil(size/res), rows2=Math.ceil(size/res);
-  const imgData=ctx.createImageData(cols*res,rows2*res);
+  const res=4, cols=Math.ceil(plotSize/res), rows2=Math.ceil(plotSize/res);
+  const imgData=ctx.createImageData(cols*res, rows2*res);
   for (let r=0;r<rows2;r++) for (let cc=0;cc<cols;cc++) {
     const x=ox+cc*res, y=oy+r*res;
-    const v = known.length===1 ? known[0].alt : idw(known,x,y,2);
+    const v = known.length===1 ? known[0].alt : idw(known,x,y);
     const norm=0.5+(v-altCenter)/spread;
     const [cr,cg,cb]=altColor(norm);
     for (let dy=0;dy<res;dy++) for (let dx=0;dx<res;dx++) {
@@ -892,30 +730,60 @@ function drawHeatmap() {
       imgData.data[idx]=cr; imgData.data[idx+1]=cg; imgData.data[idx+2]=cb; imgData.data[idx+3]=220;
     }
   }
-  const oc=new OffscreenCanvas(cols*res,rows2*res);
+  const oc=new OffscreenCanvas(cols*res, rows2*res);
   oc.getContext('2d').putImageData(imgData,0,0);
-  ctx.drawImage(oc,ox,oy,size,size);
+  ctx.drawImage(oc, ox, oy, plotSize, plotSize);
 
   // 枠線
-  ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
-  ctx.strokeRect(ox,oy,size,size);
+  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+  ctx.strokeRect(ox, oy, plotSize, plotSize);
 
-  // センター基準点マーカー（中心に十字）
-  const cx=W/2, cy=H/2;
-  ctx.strokeStyle='#ffaa00'; ctx.lineWidth=2;
-  ctx.beginPath();
-  ctx.moveTo(cx-14,cy); ctx.lineTo(cx+14,cy);
-  ctx.moveTo(cx,cy-14); ctx.lineTo(cx,cy+14);
-  ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2);
-  ctx.fillStyle='#ffaa00'; ctx.fill();
+  // 4隅の記録点マーカー
+  const corners = currentField.corners || {};
+  const cornerPos = [
+    {key:'tl',x:ox,y:oy},{key:'tr',x:ox+plotSize,y:oy},
+    {key:'bl',x:ox,y:oy+plotSize},{key:'br',x:ox+plotSize,y:oy+plotSize}
+  ];
+  cornerPos.forEach(({key,x,y}) => {
+    if (corners[key]) {
+      ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2);
+      ctx.fillStyle='#00ff88'; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    }
+  });
+
+  // センター基準点マーカー
+  if (currentField.centerAlt != null) {
+    const cx=size/2, cy=size/2;
+    ctx.strokeStyle='#ffaa00'; ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(cx-18,cy); ctx.lineTo(cx+18,cy);
+    ctx.moveTo(cx,cy-18); ctx.lineTo(cx,cy+18);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
+    ctx.fillStyle='#ffaa00'; ctx.fill();
+  }
 }
+
+// ════════════════════════════════════════════
+//  測定終了ボタン
+// ════════════════════════════════════════════
+document.getElementById('btnEndMeasure').onclick = () => {
+  autoRecording = false;
+  currentField = null;
+  document.getElementById('measureSec').style.display = 'none';
+  document.getElementById('statusBar').style.display = 'none';
+  document.getElementById('centerMark').style.display = 'none';
+  drawHeatmap();
+  renderFieldList();
+  // 圃場リストまでスクロール
+  setTimeout(() => document.getElementById('fieldList').scrollIntoView({behavior:'smooth', block:'start'}), 150);
+};
 
 // ════════════════════════════════════════════
 //  初期化
 // ════════════════════════════════════════════
 renderFieldList();
-switchArea(AREAS[0]);
 if (areaFields().length > 0) selectField(areaFields()[0].id);
 </script>
 </body>
