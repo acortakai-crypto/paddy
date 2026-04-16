@@ -16,7 +16,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
 html,body{
   width:100%;background:var(--bg);color:var(--txt);
-  font-family:var(--font);font-size:14px;
+  font-family:var(--font);font-size:17px;
   -webkit-tap-highlight-color:transparent;
   overflow-x:hidden;
 }
@@ -25,9 +25,9 @@ html,body{
 .topbar{
   position:sticky;top:0;z-index:100;
   background:var(--sur);border-bottom:1px solid var(--bdr);
-  display:flex;align-items:center;padding:0 12px;height:44px;gap:8px;
+  display:flex;align-items:center;padding:0 16px;height:52px;gap:10px;
 }
-.logo{font-weight:700;font-size:13px;color:var(--acc);}
+.logo{font-weight:700;font-size:16px;color:var(--acc);}
 .logo span{color:var(--txt2);font-weight:400;}
 .badge{font-size:9px;border:1px solid rgba(0,212,170,.35);color:var(--acc);padding:1px 6px;border-radius:3px;font-family:var(--mono);}
 .conn-dot{width:8px;height:8px;border-radius:50%;background:#444;margin-left:auto;flex-shrink:0;}
@@ -76,31 +76,31 @@ html,body{
   display:flex;gap:0;overflow-x:auto;
 }
 .stat-item{
-  flex:1;min-width:70px;padding:8px 4px;text-align:center;
+  flex:1;min-width:70px;padding:12px 4px;text-align:center;
   border-right:1px solid var(--bdr);
 }
 .stat-item:last-child{border-right:none;}
-.stat-v{font-family:var(--mono);font-size:13px;font-weight:700;}
-.stat-l{font-size:9px;color:var(--txt2);margin-top:2px;}
+.stat-v{font-family:var(--mono);font-size:16px;font-weight:700;}
+.stat-l{font-size:11px;color:var(--txt2);margin-top:3px;}
 
 /* ══ コントロールパネル（スクロール領域） ══ */
-.panel{padding:16px 14px;display:flex;flex-direction:column;gap:14px;}
+.panel{padding:20px 16px;display:flex;flex-direction:column;gap:18px;}
 
 /* セクション */
 .sec{background:var(--sur);border-radius:10px;overflow:hidden;}
 .sec-hd{
-  padding:10px 14px;font-size:11px;font-weight:700;
+  padding:14px 16px;font-size:14px;font-weight:700;
   letter-spacing:.1em;color:var(--txt2);text-transform:uppercase;
   border-bottom:1px solid var(--bdr);background:var(--sur2);
 }
-.sec-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+.sec-body{padding:16px;display:flex;flex-direction:column;gap:14px;}
 
 /* ボタン */
 .btn{
   display:flex;align-items:center;justify-content:center;gap:6px;
-  padding:10px 14px;border-radius:8px;border:1px solid var(--bdr);
+  padding:14px;border-radius:10px;border:1px solid var(--bdr);
   background:var(--sur2);color:var(--txt);font-family:var(--font);
-  font-size:13px;cursor:pointer;transition:opacity .15s;width:100%;
+  font-size:16px;cursor:pointer;transition:opacity .15s;width:100%;
 }
 .btn:active{opacity:.7;}
 .btn.acc{background:var(--acc);border-color:var(--acc);color:#000;font-weight:700;}
@@ -113,23 +113,23 @@ html,body{
 
 /* GPS情報 */
 .gps-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.gps-item{background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;}
-.gps-lbl{font-size:9px;color:var(--txt2);margin-bottom:2px;}
-.gps-val{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--acc);}
+.gps-item{background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;}
+.gps-lbl{font-size:12px;color:var(--txt2);margin-bottom:4px;}
+.gps-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--acc);}
 
 /* ログ */
 .nmea{
   background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;
   padding:8px 10px;font-family:var(--mono);font-size:10px;color:var(--txt2);
-  min-height:36px;white-space:pre-wrap;word-break:break-all;line-height:1.5;
+  min-height:44px;white-space:pre-wrap;word-break:break-all;line-height:1.6;font-size:12px;
 }
 
 /* エリアボタン */
 .area-btns{display:flex;gap:8px;}
 .area-btn{
-  flex:1;padding:10px 4px;border-radius:8px;border:1px solid var(--bdr);
+  flex:1;padding:14px 4px;border-radius:10px;border:1px solid var(--bdr);
   background:var(--sur2);color:var(--txt2);font-family:var(--font);
-  font-size:14px;font-weight:700;cursor:pointer;text-align:center;
+  font-size:17px;font-weight:700;cursor:pointer;text-align:center;
   transition:all .15s;
 }
 .area-btn.active{background:var(--acc);border-color:var(--acc);color:#000;}
@@ -137,33 +137,33 @@ html,body{
 /* 圃場リスト */
 .field-list{display:flex;flex-direction:column;gap:8px;}
 .fc{
-  background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;
-  padding:12px 14px;cursor:pointer;transition:border-color .15s;
+  background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;
+  padding:16px;cursor:pointer;transition:border-color .15s;
 }
 .fc.active{border-color:var(--acc);}
-.fc-name{font-size:14px;font-weight:700;color:var(--txt);margin-bottom:4px;}
-.fc-meta{font-size:11px;color:var(--txt2);}
+.fc-name{font-size:17px;font-weight:700;color:var(--txt);margin-bottom:6px;}
+.fc-meta{font-size:13px;color:var(--txt2);}
 
 /* 基準点 */
 .ref-box{
   background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;
   padding:12px 14px;display:flex;align-items:center;gap:10px;
 }
-.ref-val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--ora);flex:1;}
+.ref-val{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--ora);flex:1;}
 
 /* 入力 */
 .input-row{display:flex;align-items:center;gap:8px;}
 .input-row label{font-size:12px;color:var(--txt2);white-space:nowrap;}
 input[type=number],input[type=text]{
-  background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;
-  color:var(--txt);font-size:13px;padding:8px 10px;font-family:var(--font);
+  background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;
+  color:var(--txt);font-size:16px;padding:12px 14px;font-family:var(--font);
 }
-input[type=number]{width:60px;text-align:center;}
+input[type=number]{width:72px;text-align:center;}
 input[type=text]{flex:1;}
 input:focus{outline:none;border-color:var(--acc);}
 
 /* オートステータス */
-.auto-status{font-size:12px;color:var(--txt2);text-align:center;padding:4px 0;}
+.auto-status{font-size:15px;color:var(--txt2);text-align:center;padding:6px 0;}
 
 /* モーダル */
 .modal-ov{
@@ -192,6 +192,8 @@ input:focus{outline:none;border-color:var(--acc);}
 .legend-labels{display:flex;justify-content:space-between;font-size:10px;margin-top:2px;}
 .legend-labels span{font-family:var(--mono);}
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
 
@@ -204,14 +206,15 @@ input:focus{outline:none;border-color:var(--acc);}
 
 <!-- ヒートマップ（画面いっぱい正方形） -->
 <div class="map-wrap" id="mapWrap">
-  <canvas id="heatmap"></canvas>
+  <div id="leafletMap" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></div>
+  <canvas id="heatmap" style="position:absolute;top:0;left:0;z-index:2;pointer-events:none;"></canvas>
   <!-- 4隅ボタン -->
   <button class="corner-btn corner-tl" id="cornerTL" disabled>左上<br>記録</button>
   <button class="corner-btn corner-tr" id="cornerTR" disabled>右上<br>記録</button>
   <button class="corner-btn corner-bl" id="cornerBL" disabled>左下<br>記録</button>
   <button class="corner-btn corner-br" id="cornerBR" disabled>右下<br>記録</button>
   <!-- センターマーカー -->
-  <svg class="center-mark" id="centerMark" style="display:none" viewBox="0 0 24 24">
+  <svg class="center-mark" id="centerMark" style="display:none;z-index:10;" style="display:none" viewBox="0 0 24 24">
     <line x1="12" y1="2" x2="12" y2="22" stroke="#ffaa00" stroke-width="2"/>
     <line x1="2" y1="12" x2="22" y2="12" stroke="#ffaa00" stroke-width="2"/>
     <circle cx="12" cy="12" r="3" fill="#ffaa00"/>
@@ -375,6 +378,7 @@ document.getElementById('btnConnect').onclick = () => {
       const isRTK = gpsData.accuracy != null && gpsData.accuracy < 0.1;
       document.getElementById('gpsFix').textContent = isRTK ? 'RTK' : 'GPS';
       document.getElementById('gpsFix').style.color  = isRTK ? '#00ff88' : '#ffaa00';
+      updateMapPosition(gpsData.lat, gpsData.lon);
       tryAutoRecord();
     },
     err => {
@@ -696,25 +700,55 @@ function drawHeatmap() {
   const plotSize = size - pad*2;
   const ox = pad, oy = pad;
 
-  // 既知点をcanvas座標に変換
-  const lats = measured.filter(p=>p.lat!=null).map(p=>p.lat);
-  const lons = measured.filter(p=>p.lon!=null).map(p=>p.lon);
+  // 4隅データも補間に使う
+  const corners2 = currentField.corners || {};
+  const cornerPts = [
+    {key:'tl', canvX:ox,           canvY:oy},
+    {key:'tr', canvX:ox+plotSize,  canvY:oy},
+    {key:'bl', canvX:ox,           canvY:oy+plotSize},
+    {key:'br', canvX:ox+plotSize,  canvY:oy+plotSize},
+  ];
+
+  // 走行点と4隅点を合わせた全既知点
+  const allPts = [...measured];
+  cornerPts.forEach(cp => {
+    if (corners2[cp.key]) allPts.push({
+      lat: corners2[cp.key].lat,
+      lon: corners2[cp.key].lon,
+      alt: corners2[cp.key].alt,
+      _cornerCanvX: cp.canvX,
+      _cornerCanvY: cp.canvY
+    });
+  });
+
+  const lats = allPts.filter(p=>p.lat!=null).map(p=>p.lat);
+  const lons = allPts.filter(p=>p.lon!=null).map(p=>p.lon);
   let known;
   if (lats.length >= 2) {
     const latMax2=Math.max(...lats),latMin2=Math.min(...lats);
     const lonMin2=Math.min(...lons),lonMax2=Math.max(...lons);
     const latR=Math.max(latMax2-latMin2,0.00001), lonR=Math.max(lonMax2-lonMin2,0.00001);
-    known = measured.filter(p=>p.lat!=null).map(p=>({
-      px: ox+((p.lon-lonMin2)/lonR)*plotSize,
-      py: oy+((latMax2-p.lat)/latR)*plotSize,
+    known = allPts.filter(p=>p.lat!=null).map(p=>({
+      px: p._cornerCanvX != null ? p._cornerCanvX : ox+((p.lon-lonMin2)/lonR)*plotSize,
+      py: p._cornerCanvY != null ? p._cornerCanvY : oy+((latMax2-p.lat)/latR)*plotSize,
       alt: p.alt
     }));
   } else {
-    known = measured.map((p,i)=>({
-      px: ox+(i/(measured.length-1||1))*plotSize,
-      py: size/2,
-      alt: p.alt
-    }));
+    // 緯度経度なし: 4隅が登録されていれば四隅に配置
+    const hasCornersData = cornerPts.filter(cp=>corners2[cp.key]);
+    if (hasCornersData.length >= 2) {
+      known = hasCornersData.map(cp=>({
+        px: cp.canvX, py: cp.canvY, alt: corners2[cp.key].alt
+      }));
+      measured.forEach((p,i)=>{
+        known.push({px:ox+(i/(measured.length-1||1))*plotSize, py:size/2, alt:p.alt});
+      });
+    } else {
+      known = measured.map((p,i)=>({
+        px: ox+(i/(measured.length-1||1))*plotSize,
+        py: size/2, alt:p.alt
+      }));
+    }
   }
 
   // IDW補間
@@ -763,6 +797,8 @@ function drawHeatmap() {
     ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
     ctx.fillStyle='#ffaa00'; ctx.fill();
   }
+  // 地図にヒートマップを重ねる
+  setTimeout(overlayHeatmapOnMap, 0);
 }
 
 // ════════════════════════════════════════════
@@ -779,6 +815,56 @@ document.getElementById('btnEndMeasure').onclick = () => {
   // 圃場リストまでスクロール
   setTimeout(() => document.getElementById('fieldList').scrollIntoView({behavior:'smooth', block:'start'}), 150);
 };
+
+// ════════════════════════════════════════════
+//  Leaflet地図
+// ════════════════════════════════════════════
+let leafletMap = null;
+let currentMarker = null;
+let heatOverlay = null;
+
+function initMap(lat, lon) {
+  if (leafletMap) return;
+  const mapEl = document.getElementById('leafletMap');
+  leafletMap = L.map(mapEl, {
+    center: [lat || 37.5, lon || 138.9],
+    zoom: 17,
+    zoomControl: true,
+    attributionControl: false
+  });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 20
+  }).addTo(leafletMap);
+  // 現在地マーカー
+  currentMarker = L.circleMarker([lat||37.5, lon||138.9], {
+    radius: 8, color:'#00d4aa', fillColor:'#00d4aa',
+    fillOpacity:1, weight:2
+  }).addTo(leafletMap);
+}
+
+function updateMapPosition(lat, lon) {
+  if (!leafletMap) { initMap(lat, lon); return; }
+  if (currentMarker) currentMarker.setLatLng([lat, lon]);
+  leafletMap.setView([lat, lon], leafletMap.getZoom());
+}
+
+// ヒートマップcanvasを地図に重ねる
+function overlayHeatmapOnMap() {
+  if (!leafletMap || !currentField) return;
+  const pts = (currentField.points||[]);
+  const corners2 = currentField.corners||{};
+  const allLats = [...pts.filter(p=>p.lat!=null).map(p=>p.lat)];
+  const allLons = [...pts.filter(p=>p.lon!=null).map(p=>p.lon)];
+  ['tl','tr','bl','br'].forEach(k=>{ if(corners2[k]){allLats.push(corners2[k].lat);allLons.push(corners2[k].lon);} });
+  if (allLats.length < 2) return;
+  const latMax=Math.max(...allLats),latMin=Math.min(...allLats);
+  const lonMin=Math.min(...allLons),lonMax=Math.max(...allLons);
+  // canvasをLeafletのImageOverlayとして表示
+  if (heatOverlay) leafletMap.removeLayer(heatOverlay);
+  const bounds = [[latMin, lonMin],[latMax, lonMax]];
+  heatOverlay = L.imageOverlay(canvas.toDataURL(), bounds, {opacity:0.7}).addTo(leafletMap);
+  leafletMap.fitBounds(bounds, {padding:[20,20]});
+}
 
 // ════════════════════════════════════════════
 //  初期化
