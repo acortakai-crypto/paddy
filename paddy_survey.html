@@ -290,7 +290,7 @@ input:focus{outline:none;border-color:var(--acc);}
         <button class="btn red" id="btnResetCenter" style="width:auto;padding:6px 10px;font-size:11px">リセット</button>
       </div>
       <button class="btn ora" id="btnMeasure" disabled>🎯 ここを基準点に設定</button>
-      <div class="auto-status" id="autoRecordStatus">基準点設定後は走行するだけで自動記録</div>
+      <div class="auto-status" id="autoRecordStatus">4隅のどれかを押すと記録開始</div>
       <!-- legend -->
       <div>
         <div class="legend-wrap">
@@ -404,8 +404,9 @@ function setConnected(v) {
   document.getElementById('btnDisconnect').disabled = !v;
   document.getElementById('btnMeasure').disabled    = !v;
   ['cornerTL','cornerTR','cornerBL','cornerBR'].forEach(id => {
-    document.getElementById(id).disabled = !v || !currentField || currentField.centerAlt == null;
+    document.getElementById(id).disabled = !v || !currentField;
   });
+
 }
 
 function logNMEA(msg) {
@@ -513,15 +514,16 @@ function selectField(id) {
   renderFieldList();
   document.getElementById('mainTitle').textContent = currentField.name + (currentField.note ? ' — '+currentField.note : '');
   document.getElementById('measureSec').style.display = 'block';
+  document.getElementById('btnMeasure').disabled = gpsData.alt == null;
   updateMeasureLabel();
   updateCornerBtns();
   drawHeatmap();
   const status = document.getElementById('autoRecordStatus');
   if (currentField.centerAlt != null) {
-    status.textContent = '⏸ 基準点を再設定で再開';
-    status.style.color = 'var(--txt2)';
+    status.textContent = autoRecording ? '🟢 記録中' : '4隅のどれかを押すと記録開始';
+    status.style.color = autoRecording ? 'var(--acc)' : 'var(--ora)';
   } else {
-    status.textContent = '基準点設定後は走行するだけで自動記録';
+    status.textContent = '基準点を設定してください';
     status.style.color = 'var(--txt2)';
   }
   // 測定セクションまでスクロール
@@ -540,7 +542,7 @@ function updateCornerBtns() {
     const labels = ['左上','右上','左下','右下'];
     btn.className = 'corner-btn corner-'+['tl','tr','bl','br'][i] + (corners[k] ? ' done' : '');
     btn.innerHTML = labels[i]+'<br>'+(corners[k] ? '✓' : '記録');
-    btn.disabled = !currentField || currentField.centerAlt == null || gpsData.alt == null;
+    btn.disabled = !currentField || gpsData.alt == null;
   });
 }
 
@@ -550,6 +552,12 @@ function updateCornerBtns() {
     if (!currentField.corners) currentField.corners = {tl:null,tr:null,bl:null,br:null};
     const key = pos.toLowerCase();
     currentField.corners[key] = { alt:gpsData.alt, lat:gpsData.lat, lon:gpsData.lon };
+    // 4隅のどれかを最初に押した時点で記録開始
+    if (!autoRecording) {
+      autoRecording = true;
+      const status = document.getElementById('autoRecordStatus');
+      if (status) { status.textContent = '🟢 記録中 — 走行してください'; status.style.color = 'var(--acc)'; }
+    }
     saveDB(); updateCornerBtns(); renderFieldList(); drawHeatmap();
   };
 });
@@ -565,23 +573,27 @@ document.getElementById('btnMeasure').onclick = () => {
   if (gpsData.alt == null) { alert('GPS高度データがありません'); return; }
   currentField.centerAlt = gpsData.alt;
   currentField.points    = [];
-  autoRecording          = true;
+  currentField.pendingPoints = [];
+  autoRecording = false;
   saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel(); updateCornerBtns();
   document.getElementById('centerMark').style.display = 'block';
   const status = document.getElementById('autoRecordStatus');
-  status.textContent = '🟢 自動記録中 — 走行するだけで記録されます';
-  status.style.color = 'var(--acc)';
+  status.textContent = '4隅のどれかを押すと記録開始';
+  status.style.color = 'var(--ora)';
 };
 
 document.getElementById('btnResetCenter').onclick = () => {
   if (!currentField) return;
   if (!confirm('基準点をリセットしますか？\n測定データも消えます。')) return;
-  currentField.centerAlt = null;
-  currentField.points    = [];
-  autoRecording          = false;
+  currentField.centerAlt    = null;
+  currentField.points       = [];
+  currentField.pendingPoints = [];
+  currentField.corners      = {tl:null, tr:null, bl:null, br:null};
+  autoRecording             = false;
   saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel(); updateCornerBtns();
   document.getElementById('centerMark').style.display = 'none';
-  document.getElementById('statusBar').style.display = 'none';
+  document.getElementById('statusBar').style.display  = 'none';
+
 };
 
 function updateMeasureLabel() {
@@ -608,7 +620,7 @@ function tryAutoRecord() {
   currentField.points.push({ alt:gpsData.alt, lat:gpsData.lat, lon:gpsData.lon });
   saveDB(); drawHeatmap(); renderFieldList();
   const status = document.getElementById('autoRecordStatus');
-  if (status) { status.textContent = '🟢 自動記録中 '+currentField.points.length+'点'; status.style.color = 'var(--acc)'; }
+  if (status) { status.textContent = '🟢 記録中 '+currentField.points.length+'点'; status.style.color = 'var(--acc)'; }
 }
 
 // ════════════════════════════════════════════
