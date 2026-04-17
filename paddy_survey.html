@@ -58,6 +58,7 @@ html,body{
 }
 .corner-btn:active{background:rgba(0,212,170,.4);}
 .corner-btn.done{background:rgba(0,212,170,.35);border-color:var(--grn);color:var(--grn);}
+.corner-btn:disabled{opacity:.3;pointer-events:none;}
 .corner-tl{top:8px;left:8px;}
 .corner-tr{top:8px;right:8px;}
 .corner-bl{bottom:8px;left:8px;}
@@ -406,6 +407,8 @@ function setConnected(v) {
   ['cornerTL','cornerTR','cornerBL','cornerBR'].forEach(id => {
     document.getElementById(id).disabled = !v || !currentField;
   });
+  // GPS接続時に圃場が選択されていれば4隅を有効化
+  if (v && currentField) updateCornerBtns();
 
 }
 
@@ -515,6 +518,10 @@ function selectField(id) {
   document.getElementById('mainTitle').textContent = currentField.name + (currentField.note ? ' — '+currentField.note : '');
   document.getElementById('measureSec').style.display = 'block';
   document.getElementById('btnMeasure').disabled = gpsData.alt == null;
+  // 圃場選択時に4隅ボタンを有効化（GPS接続前でも表示）
+  ['cornerTL','cornerTR','cornerBL','cornerBR'].forEach(id => {
+    document.getElementById(id).disabled = false;
+  });
   updateMeasureLabel();
   updateCornerBtns();
   drawHeatmap();
@@ -542,13 +549,14 @@ function updateCornerBtns() {
     const labels = ['左上','右上','左下','右下'];
     btn.className = 'corner-btn corner-'+['tl','tr','bl','br'][i] + (corners[k] ? ' done' : '');
     btn.innerHTML = labels[i]+'<br>'+(corners[k] ? '✓' : '記録');
-    btn.disabled = !currentField || gpsData.alt == null;
+    btn.disabled = !currentField;
   });
 }
 
 ['TL','TR','BL','BR'].forEach(pos => {
   document.getElementById('corner'+pos).onclick = () => {
-    if (!currentField || gpsData.alt == null) return;
+    if (!currentField) { alert('圃場を選択してください'); return; }
+    if (gpsData.alt == null) { alert('GPS接続してから4隅を記録してください'); return; }
     if (!currentField.corners) currentField.corners = {tl:null,tr:null,bl:null,br:null};
     const key = pos.toLowerCase();
     currentField.corners[key] = { alt:gpsData.alt, lat:gpsData.lat, lon:gpsData.lon };
