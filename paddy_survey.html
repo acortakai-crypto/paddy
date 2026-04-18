@@ -46,15 +46,15 @@ html,body{
 
 /* 4隅ボタン */
 .corner-btn{
-  position:absolute;width:80px;height:80px;
-  border-radius:50%;border:3px solid var(--acc);
-  background:rgba(0,212,170,.25);color:var(--acc);
-  font-size:15px;font-weight:700;cursor:pointer;
+  position:absolute;width:110px;height:110px;
+  border-radius:50%;border:4px solid var(--acc);
+  background:rgba(0,212,170,.35);color:var(--acc);
+  font-size:18px;font-weight:700;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  text-align:center;line-height:1.3;
+  text-align:center;line-height:1.4;
   -webkit-tap-highlight-color:transparent;
   transition:background .15s;
-  z-index:20;
+  z-index:999;
 }
 .corner-btn:active{background:rgba(0,212,170,.4);}
 .corner-btn.done{background:rgba(0,212,170,.35);border-color:var(--grn);color:var(--grn);}
@@ -209,10 +209,10 @@ input:focus{outline:none;border-color:var(--acc);}
 <div class="map-wrap" id="mapWrap">
   <div id="leafletMap" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></div>
 <!-- 4隅ボタン: fixed配置でLeafletの影響を受けない -->
-<button class="corner-btn" id="cornerTL" style="position:fixed;top:60px;left:6px;" disabled>左上<br>記録</button>
-<button class="corner-btn" id="cornerTR" style="position:fixed;top:60px;right:6px;" disabled>右上<br>記録</button>
-<button class="corner-btn" id="cornerBL" style="position:fixed;top:calc(60px + 100vw - 86px);left:6px;" disabled>左下<br>記録</button>
-<button class="corner-btn" id="cornerBR" style="position:fixed;top:calc(60px + 100vw - 86px);right:6px;" disabled>右下<br>記録</button>
+<button class="corner-btn" id="cornerTL" style="position:fixed;top:72px;left:6px;z-index:999;" disabled>左上<br>記録</button>
+<button class="corner-btn" id="cornerTR" style="position:fixed;top:72px;right:6px;z-index:999;" disabled>右上<br>記録</button>
+<button class="corner-btn" id="cornerBL" style="position:fixed;top:calc(72px + 100vw - 110px);left:6px;z-index:999;" disabled>左下<br>記録</button>
+<button class="corner-btn" id="cornerBR" style="position:fixed;top:calc(72px + 100vw - 110px);right:6px;z-index:999;" disabled>右下<br>記録</button>
   <canvas id="heatmap" style="position:absolute;top:0;left:0;z-index:2;pointer-events:none;"></canvas>
   <!-- センターマーカー -->
   <svg class="center-mark" id="centerMark" style="display:none;z-index:20;" viewBox="0 0 24 24">
@@ -292,6 +292,7 @@ input:focus{outline:none;border-color:var(--acc);}
       </div>
       <button class="btn ora" id="btnMeasure" disabled>🎯 ここを基準点に設定</button>
       <div class="auto-status" id="autoRecordStatus">4隅のどれかを押すと記録開始</div>
+      <button class="btn" id="btnToggleSelf" style="margin-top:4px;">自機位置 表示中</button>
       <!-- legend -->
       <div>
         <div class="legend-wrap">
@@ -380,7 +381,11 @@ document.getElementById('btnConnect').onclick = () => {
       document.getElementById('gpsFix').textContent = isRTK ? 'RTK' : 'GPS';
       document.getElementById('gpsFix').style.color  = isRTK ? '#00ff88' : '#ffaa00';
       updateMapPosition(gpsData.lat, gpsData.lon);
+      selfMarker.lat = gpsData.lat;
+      selfMarker.lon = gpsData.lon;
+      selfMarker.alt = gpsData.alt;
       tryAutoRecord();
+      if (currentField) drawHeatmap();
     },
     err => {
       let msg = '';
@@ -397,6 +402,7 @@ document.getElementById('btnConnect').onclick = () => {
 document.getElementById('btnDisconnect').onclick = () => {
   if (geoWatchId != null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; }
   setConnected(false); logNMEA('切断しました');
+  selfMarker = { lat:null, lon:null, alt:null };
 };
 
 function setConnected(v) {
@@ -581,7 +587,6 @@ document.getElementById('btnMeasure').onclick = () => {
   if (gpsData.alt == null) { alert('GPS高度データがありません'); return; }
   currentField.centerAlt = gpsData.alt;
   currentField.points    = [];
-  currentField.pendingPoints = [];
   autoRecording = false;
   saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel(); updateCornerBtns();
   document.getElementById('centerMark').style.display = 'block';
@@ -595,7 +600,6 @@ document.getElementById('btnResetCenter').onclick = () => {
   if (!confirm('基準点をリセットしますか？\n測定データも消えます。')) return;
   currentField.centerAlt    = null;
   currentField.points       = [];
-  currentField.pendingPoints = [];
   currentField.corners      = {tl:null, tr:null, bl:null, br:null};
   autoRecording             = false;
   saveDB(); drawHeatmap(); renderFieldList(); updateMeasureLabel(); updateCornerBtns();
@@ -666,182 +670,174 @@ function altColor(t) {
 }
 
 function drawHeatmap() {
-  const size = canvas.width || window.innerWidth;
-  ctx.clearRect(0, 0, size, size);
-  ctx.fillStyle = '#0a0e1a';
-  ctx.fillRect(0, 0, size, size);
+  const W = canvas.width || window.innerWidth;
+  const H = W;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0a0e1a'; ctx.fillRect(0,0,W,H);
 
   if (!currentField) {
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.font = '15px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('圃場を選択してください', size/2, size/2);
-    return;
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='15px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('圃場を選択してください',W/2,H/2); return;
   }
-
-  if (currentField.centerAlt == null) {
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.font = '15px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('基準点を設定してください', size/2, size/2);
-    document.getElementById('statusBar').style.display = 'none';
-    return;
+  if (currentField.centerAlt==null) {
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='15px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('基準点を設定してください',W/2,H/2);
+    document.getElementById('statusBar').style.display='none'; return;
   }
-
-  const measured = currentField.points || [];
-  if (measured.length === 0) {
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.font = '15px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('走行して測定点を記録してください', size/2, size/2);
-    document.getElementById('statusBar').style.display = 'none';
-    return;
+  const pts = currentField.points||[];
+  if (pts.length===0) {
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='15px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('4隅を押して走行開始してください',W/2,H/2);
+    document.getElementById('statusBar').style.display='none'; return;
   }
 
   const altCenter = currentField.centerAlt;
-  const alts  = measured.map(p=>p.alt);
-  const altMax= Math.max(...alts), altMin=Math.min(...alts);
-  const maxDev= Math.max(Math.abs(altMax-altCenter), Math.abs(altMin-altCenter), 0.001);
-  const spread= maxDev*2;
+  const cr2 = currentField.corners||{};
+  const pad = 20;
+  const plotW = W-pad*2, plotH = H-pad*2;
 
-  // stats
-  document.getElementById('statusBar').style.display = 'flex';
-  const hiCm=(altMax-altCenter)*100, loCm=(altMin-altCenter)*100;
-  document.getElementById('statHi').textContent    = (hiCm>=0?'+':'')+hiCm.toFixed(1);
-  document.getElementById('statLo').textContent    = (loCm>=0?'+':'')+loCm.toFixed(1);
-  document.getElementById('statRange').textContent = ((altMax-altMin)*100).toFixed(1);
-  document.getElementById('statPoints').textContent= measured.length+'点';
-  document.getElementById('legHi').textContent = (hiCm>=0?'+':'')+hiCm.toFixed(1)+' cm';
-  document.getElementById('legLo').textContent = (loCm>=0?'+':'')+loCm.toFixed(1)+' cm';
-  document.getElementById('legendLabels').style.display = 'flex';
+  // ── 座標変換: 4隅のGPS座標を基準にcanvas座標を決める ──
+  // 4隅が全部ある場合は4点アフィン変換
+  // 4隅が揃っていない場合は単純なGPS→canvas変換
+  const hasTL = cr2.tl&&cr2.tl.lat!=null;
+  const hasTR = cr2.tr&&cr2.tr.lat!=null;
+  const hasBL = cr2.bl&&cr2.bl.lat!=null;
+  const hasBR = cr2.br&&cr2.br.lat!=null;
+  const cornerCount = [hasTL,hasTR,hasBL,hasBR].filter(Boolean).length;
 
-  // 描画エリア（4隅ボタン分のpadding）
-  const pad = 68;
-  const plotSize = size - pad*2;
-  const ox = pad, oy = pad;
+  // canvas上の4隅の座標（固定）
+  const canvCorners = {
+    tl:[pad,      pad      ],
+    tr:[pad+plotW,pad      ],
+    bl:[pad,      pad+plotH],
+    br:[pad+plotW,pad+plotH],
+  };
 
-  // 4隅データも補間に使う
-  const corners2 = currentField.corners || {};
-  const cornerPts = [
-    {key:'tl', canvX:ox,           canvY:oy},
-    {key:'tr', canvX:ox+plotSize,  canvY:oy},
-    {key:'bl', canvX:ox,           canvY:oy+plotSize},
-    {key:'br', canvX:ox+plotSize,  canvY:oy+plotSize},
-  ];
+  function latLonToCanvas(lat, lon) {
+    // 4隅のGPS→canvas座標の線形マッピング
+    // 利用可能な4隅から双線形補間で変換
+    if (hasTL && hasTR && hasBL && hasBR) {
+      // 4隅全部ある: 双線形補間
+      const latMax2=Math.max(cr2.tl.lat,cr2.tr.lat);
+      const latMin2=Math.min(cr2.bl.lat,cr2.br.lat);
+      const lonMin2=Math.min(cr2.tl.lon,cr2.bl.lon);
+      const lonMax2=Math.max(cr2.tr.lon,cr2.br.lon);
+      const tx=(lon-lonMin2)/Math.max(lonMax2-lonMin2,0.000001);
+      const ty=(latMax2-lat)/Math.max(latMax2-latMin2,0.000001);
+      return [pad+tx*plotW, pad+ty*plotH];
+    } else if (cornerCount >= 2) {
+      // 2〜3隅: 利用可能な隅から線形変換
+      const refs=[];
+      if(hasTL)refs.push({gLat:cr2.tl.lat,gLon:cr2.tl.lon,cx:canvCorners.tl[0],cy:canvCorners.tl[1]});
+      if(hasTR)refs.push({gLat:cr2.tr.lat,gLon:cr2.tr.lon,cx:canvCorners.tr[0],cy:canvCorners.tr[1]});
+      if(hasBL)refs.push({gLat:cr2.bl.lat,gLon:cr2.bl.lon,cx:canvCorners.bl[0],cy:canvCorners.bl[1]});
+      if(hasBR)refs.push({gLat:cr2.br.lat,gLon:cr2.br.lon,cx:canvCorners.br[0],cy:canvCorners.br[1]});
+      const lats2=refs.map(r=>r.gLat), lons2=refs.map(r=>r.gLon);
+      const laMax2=Math.max(...lats2),laMin2=Math.min(...lats2);
+      const loMin2=Math.min(...lons2),loMax2=Math.max(...lons2);
+      const cxMin=Math.min(...refs.map(r=>r.cx)),cxMax=Math.max(...refs.map(r=>r.cx));
+      const cyMin=Math.min(...refs.map(r=>r.cy)),cyMax=Math.max(...refs.map(r=>r.cy));
+      const tx=(lon-loMin2)/Math.max(loMax2-loMin2,0.000001);
+      const ty=(laMax2-lat)/Math.max(laMax2-laMin2,0.000001);
+      return [cxMin+tx*(cxMax-cxMin), cyMin+ty*(cyMax-cyMin)];
+    } else {
+      // 4隅なし: GPS範囲でスケーリング
+      const allLats=pts.map(p=>p.lat).filter(v=>v!=null);
+      const allLons=pts.map(p=>p.lon).filter(v=>v!=null);
+      if(allLats.length<2) return [W/2,H/2];
+      const laMax2=Math.max(...allLats),laMin2=Math.min(...allLats);
+      const loMin2=Math.min(...allLons),loMax2=Math.max(...allLons);
+      const laR2=Math.max(laMax2-laMin2,0.000001),loR2=Math.max(loMax2-loMin2,0.000001);
+      return [pad+((lon-loMin2)/loR2)*plotW, pad+((laMax2-lat)/laR2)*plotH];
+    }
+  }
 
-  // 走行点と4隅点を合わせた全既知点
-  const allPts = [...measured];
-  cornerPts.forEach(cp => {
-    if (corners2[cp.key]) allPts.push({
-      lat: corners2[cp.key].lat,
-      lon: corners2[cp.key].lon,
-      alt: corners2[cp.key].alt,
-      _cornerCanvX: cp.canvX,
-      _cornerCanvY: cp.canvY
-    });
+  // 全既知点をcanvas座標に変換
+  const known = pts.filter(p=>p.lat!=null).map(p=>{
+    const [px,py]=latLonToCanvas(p.lat,p.lon);
+    return {px,py,alt:p.alt};
+  });
+  // 4隅も追加
+  ['tl','tr','bl','br'].forEach(k=>{
+    if(cr2[k]&&cr2[k].lat!=null){
+      known.push({px:canvCorners[k][0],py:canvCorners[k][1],alt:cr2[k].alt});
+    }
   });
 
-  const lats = allPts.filter(p=>p.lat!=null).map(p=>p.lat);
-  const lons = allPts.filter(p=>p.lon!=null).map(p=>p.lon);
-  let known;
-  if (lats.length >= 2) {
-    const latMax2=Math.max(...lats),latMin2=Math.min(...lats);
-    const lonMin2=Math.min(...lons),lonMax2=Math.max(...lons);
-    const latR=Math.max(latMax2-latMin2,0.00001), lonR=Math.max(lonMax2-lonMin2,0.00001);
-    known = allPts.filter(p=>p.lat!=null).map(p=>({
-      px: p._cornerCanvX != null ? p._cornerCanvX : ox+((p.lon-lonMin2)/lonR)*plotSize,
-      py: p._cornerCanvY != null ? p._cornerCanvY : oy+((latMax2-p.lat)/latR)*plotSize,
-      alt: p.alt
-    }));
-  } else {
-    // 緯度経度なし: 4隅が登録されていれば四隅に配置
-    const hasCornersData = cornerPts.filter(cp=>corners2[cp.key]);
-    if (hasCornersData.length >= 2) {
-      known = hasCornersData.map(cp=>({
-        px: cp.canvX, py: cp.canvY, alt: corners2[cp.key].alt
-      }));
-      measured.forEach((p,i)=>{
-        known.push({px:ox+(i/(measured.length-1||1))*plotSize, py:size/2, alt:p.alt});
-      });
-    } else {
-      known = measured.map((p,i)=>({
-        px: ox+(i/(measured.length-1||1))*plotSize,
-        py: size/2, alt:p.alt
-      }));
-    }
+  if(known.length<2){
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='13px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('データが不足しています',W/2,H/2); return;
   }
 
-  // IDW補間
-  const res=4, cols=Math.ceil(plotSize/res), rows2=Math.ceil(plotSize/res);
-  const imgData=ctx.createImageData(cols*res, rows2*res);
-  for (let r=0;r<rows2;r++) for (let cc=0;cc<cols;cc++) {
-    const x=ox+cc*res, y=oy+r*res;
-    const v = known.length===1 ? known[0].alt : idw(known,x,y);
-    const norm=0.5+(v-altCenter)/spread;
+  // 統計
+  const alts=known.map(k=>k.alt);
+  const altMax=Math.max(...alts),altMin2=Math.min(...alts);
+  const maxDev=Math.max(Math.abs(altMax-altCenter),Math.abs(altMin2-altCenter),0.001);
+  const spread=maxDev*2;
+
+  document.getElementById('statusBar').style.display='flex';
+  const hiCm=(altMax-altCenter)*100, loCm=(altMin2-altCenter)*100;
+  document.getElementById('statHi').textContent    =(hiCm>=0?'+':'')+hiCm.toFixed(1);
+  document.getElementById('statLo').textContent    =(loCm>=0?'+':'')+loCm.toFixed(1);
+  document.getElementById('statRange').textContent =((altMax-altMin2)*100).toFixed(1);
+  document.getElementById('statPoints').textContent=pts.length+'点';
+  document.getElementById('legHi').textContent=(hiCm>=0?'+':'')+hiCm.toFixed(1)+' cm';
+  document.getElementById('legLo').textContent=(loCm>=0?'+':'')+loCm.toFixed(1)+' cm';
+  document.getElementById('legendLabels').style.display='flex';
+
+  // IDW補間してヒートマップ描画
+  const res=4,cols=Math.ceil(plotW/res),rows2=Math.ceil(plotH/res);
+  const imgData=ctx.createImageData(cols*res,rows2*res);
+  for(let r=0;r<rows2;r++) for(let cc=0;cc<cols;cc++){
+    const x=pad+cc*res, y=pad+r*res;
+    const v=known.length===1?known[0].alt:idw(known,x,y);
+    const norm=Math.max(0,Math.min(1,0.5+(v-altCenter)/spread));
     const [cr,cg,cb]=altColor(norm);
-    for (let dy=0;dy<res;dy++) for (let dx=0;dx<res;dx++) {
+    for(let dy=0;dy<res;dy++) for(let dx=0;dx<res;dx++){
       const idx=((r*res+dy)*(cols*res)+cc*res+dx)*4;
-      imgData.data[idx]=cr; imgData.data[idx+1]=cg; imgData.data[idx+2]=cb; imgData.data[idx+3]=220;
+      imgData.data[idx]=cr;imgData.data[idx+1]=cg;imgData.data[idx+2]=cb;imgData.data[idx+3]=220;
     }
   }
-  const oc=new OffscreenCanvas(cols*res, rows2*res);
+  const oc=new OffscreenCanvas(cols*res,rows2*res);
   oc.getContext('2d').putImageData(imgData,0,0);
-  ctx.drawImage(oc, ox, oy, plotSize, plotSize);
+  ctx.drawImage(oc,pad,pad,plotW,plotH);
 
   // 枠線
-  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
-  ctx.strokeRect(ox, oy, plotSize, plotSize);
+  ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1;
+  ctx.strokeRect(pad,pad,plotW,plotH);
 
-  // 4隅の記録点マーカー
-  const corners = currentField.corners || {};
-  const cornerPos = [
-    {key:'tl',x:ox,y:oy},{key:'tr',x:ox+plotSize,y:oy},
-    {key:'bl',x:ox,y:oy+plotSize},{key:'br',x:ox+plotSize,y:oy+plotSize}
-  ];
-  cornerPos.forEach(({key,x,y}) => {
-    if (corners[key]) {
-      ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2);
-      ctx.fillStyle='#00ff88'; ctx.fill();
-      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
-    }
+  // 4隅マーカー
+  ['tl','tr','bl','br'].forEach(k=>{
+    if(!cr2[k]) return;
+    const [x,y]=canvCorners[k];
+    ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);
+    ctx.fillStyle='#00ff88';ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
   });
 
-  // センター基準点マーカー
-  if (currentField.centerAlt != null) {
-    const cx=size/2, cy=size/2;
-    ctx.strokeStyle='#ffaa00'; ctx.lineWidth=2;
-    ctx.beginPath();
-    ctx.moveTo(cx-18,cy); ctx.lineTo(cx+18,cy);
-    ctx.moveTo(cx,cy-18); ctx.lineTo(cx,cy+18);
-    ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
-    ctx.fillStyle='#ffaa00'; ctx.fill();
+  // 現在位置マーカー
+  if(showSelfMarker&&selfMarker&&selfMarker.lat!=null){
+    const [mx,my]=latLonToCanvas(selfMarker.lat,selfMarker.lon);
+    if(mx>=pad&&mx<=pad+plotW&&my>=pad&&my<=pad+plotH){
+      ctx.beginPath();ctx.arc(mx,my,12,0,Math.PI*2);
+      ctx.fillStyle='#00d4aa';ctx.fill();
+      ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.stroke();
+      // 進行方向の矢印
+      ctx.fillStyle='#fff';
+      ctx.font='bold 12px sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('●',mx,my);
+    }
   }
-  // 地図にヒートマップを重ねる
-  setTimeout(overlayHeatmapOnMap, 0);
+
+  // 地図オーバーレイ
+  setTimeout(overlayHeatmapOnMap,0);
 }
 
-// ════════════════════════════════════════════
-//  測定終了ボタン
-// ════════════════════════════════════════════
-document.getElementById('btnEndMeasure').onclick = () => {
-  autoRecording = false;
-  currentField = null;
-  document.getElementById('measureSec').style.display = 'none';
-  document.getElementById('statusBar').style.display = 'none';
-  document.getElementById('centerMark').style.display = 'none';
-  drawHeatmap();
-  renderFieldList();
-  // 圃場リストまでスクロール
-  setTimeout(() => document.getElementById('fieldList').scrollIntoView({behavior:'smooth', block:'start'}), 150);
-};
-
-// ════════════════════════════════════════════
-//  Leaflet地図
-// ════════════════════════════════════════════
-let leafletMap = null;
-let currentMarker = null;
-let heatOverlay = null;
 
 function initMap(lat, lon) {
   if (leafletMap) return;
@@ -885,6 +881,34 @@ function overlayHeatmapOnMap() {
   heatOverlay = L.imageOverlay(canvas.toDataURL(), bounds, {opacity:0.7}).addTo(leafletMap);
   leafletMap.fitBounds(bounds, {padding:[20,20]});
 }
+
+// ════════════════════════════════════════════
+//  自機位置 表示/非表示
+// ════════════════════════════════════════════
+let showSelfMarker = true;
+let selfMarker = { lat:null, lon:null, alt:null };
+
+const _toggleSelfBtn = document.getElementById('btnToggleSelf');
+if (_toggleSelfBtn) _toggleSelfBtn.onclick = () => {
+  showSelfMarker = !showSelfMarker;
+  const btn = document.getElementById('btnToggleSelf');
+  btn.textContent = '自機位置 ' + (showSelfMarker ? '表示中' : '非表示');
+  btn.style.color = showSelfMarker ? 'var(--acc)' : 'var(--txt2)';
+  btn.style.borderColor = showSelfMarker ? 'var(--acc)' : 'var(--bdr)';
+  drawHeatmap();
+};
+
+document.getElementById('btnEndMeasure').onclick = () => {
+  autoRecording = false;
+  currentField = null;
+  document.getElementById('measureSec').style.display = 'none';
+  document.getElementById('statusBar').style.display  = 'none';
+  document.getElementById('centerMark').style.display = 'none';
+  selfMarker = { lat:null, lon:null, alt:null };
+  drawHeatmap();
+  renderFieldList();
+  setTimeout(() => document.getElementById('fieldList').scrollIntoView({behavior:'smooth',block:'start'}), 150);
+};
 
 // ════════════════════════════════════════════
 //  初期化
