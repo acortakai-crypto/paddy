@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Permissions-Policy" content="geolocation=*">
 <title>圃場高低差測定</title>
 <style>
@@ -16,8 +16,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
 html,body{
   width:100%;background:var(--bg);color:var(--txt);
-  font-family:var(--font);font-size:42px;
+  font-family:var(--font);font-size:16px;
   -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
   overflow-x:hidden;
 }
 
@@ -27,7 +28,7 @@ html,body{
   background:var(--sur);border-bottom:1px solid var(--bdr);
   display:flex;align-items:center;padding:0 32px;height:72px;gap:10px;
 }
-.logo{font-weight:700;font-size:40px;color:var(--acc);}
+.logo{font-weight:700;font-size:16px;color:var(--acc);}
 .logo span{color:var(--txt2);font-weight:400;}
 .badge{font-size:22px;border:1px solid rgba(0,212,170,.35);color:var(--acc);padding:2px 12px;border-radius:4px;font-family:var(--mono);}
 .conn-dot{width:8px;height:8px;border-radius:50%;background:#444;margin-left:auto;flex-shrink:0;}
@@ -81,7 +82,7 @@ html,body{
   border-right:1px solid var(--bdr);
 }
 .stat-item:last-child{border-right:none;}
-.stat-v{font-family:var(--mono);font-size:40px;font-weight:700;}
+.stat-v{font-family:var(--mono);font-size:16px;font-weight:700;}
 .stat-l{font-size:27px;color:var(--txt2);margin-top:3px;}
 
 /* ══ コントロールパネル（スクロール領域） ══ */
@@ -90,7 +91,7 @@ html,body{
 /* セクション */
 .sec{background:var(--sur);border-radius:15px;overflow:hidden;}
 .sec-hd{
-  padding:28px 32px;font-size:35px;font-weight:700;
+  padding:28px 32px;font-size:14px;font-weight:700;
   letter-spacing:.1em;color:var(--txt2);text-transform:uppercase;
   border-bottom:1px solid var(--bdr);background:var(--sur2);
 }
@@ -101,7 +102,7 @@ html,body{
   display:flex;align-items:center;justify-content:center;gap:6px;
   padding:28px;border-radius:15px;border:1px solid var(--bdr);
   background:var(--sur2);color:var(--txt);font-family:var(--font);
-  font-size:40px;cursor:pointer;transition:opacity .15s;width:100%;
+  font-size:16px;cursor:pointer;transition:opacity .15s;width:100%;
 }
 .btn:active{opacity:.7;}
 .btn.acc{background:var(--acc);border-color:var(--acc);color:#000;font-weight:700;}
@@ -115,8 +116,8 @@ html,body{
 /* GPS情報 */
 .gps-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .gps-item{background:var(--sur2);border:1px solid var(--bdr);border-radius:15px;padding:24px 28px;}
-.gps-lbl{font-size:30px;color:var(--txt2);margin-bottom:4px;}
-.gps-val{font-family:var(--mono);font-size:48px;font-weight:700;color:var(--acc);}
+.gps-lbl{font-size:12px;color:var(--txt2);margin-bottom:4px;}
+.gps-val{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--acc);}
 
 /* ログ */
 .nmea{
@@ -130,7 +131,7 @@ html,body{
 .area-btn{
   flex:1;padding:28px 8px;border-radius:15px;border:1px solid var(--bdr);
   background:var(--sur2);color:var(--txt2);font-family:var(--font);
-  font-size:42px;font-weight:700;cursor:pointer;text-align:center;
+  font-size:17px;font-weight:700;cursor:pointer;text-align:center;
   transition:all .15s;
 }
 .area-btn.active{background:var(--acc);border-color:var(--acc);color:#000;}
@@ -142,40 +143,40 @@ html,body{
   padding:32px;cursor:pointer;transition:border-color .15s;
 }
 .fc.active{border-color:var(--acc);}
-.fc-name{font-size:42px;font-weight:700;color:var(--txt);margin-bottom:6px;}
-.fc-meta{font-size:32px;color:var(--txt2);}
+.fc-name{font-size:17px;font-weight:700;color:var(--txt);margin-bottom:6px;}
+.fc-meta{font-size:13px;color:var(--txt2);}
 
 /* 基準点 */
 .ref-box{
   background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;
   padding:24px 28px;display:flex;align-items:center;gap:10px;
 }
-.ref-val{font-family:var(--mono);font-size:48px;font-weight:700;color:var(--ora);flex:1;}
+.ref-val{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--ora);flex:1;}
 
 /* 入力 */
 .input-row{display:flex;align-items:center;gap:8px;}
-.input-row label{font-size:30px;color:var(--txt2);white-space:nowrap;}
+.input-row label{font-size:12px;color:var(--txt2);white-space:nowrap;}
 input[type=number],input[type=text]{
   background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;
-  color:var(--txt);font-size:40px;padding:24px 28px;font-family:var(--font);
+  color:var(--txt);font-size:16px;padding:24px 28px;font-family:var(--font);
 }
 input[type=number]{width:72px;text-align:center;}
 input[type=text]{flex:1;}
 input:focus{outline:none;border-color:var(--acc);}
 
 /* オートステータス */
-.auto-status{font-size:37px;color:var(--txt2);text-align:center;padding:12px 0;}
+.auto-status{font-size:15px;color:var(--txt2);text-align:center;padding:12px 0;}
 
 /* モーダル */
 .modal-ov{
   display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
-  z-index:200;align-items:center;justify-content:center;padding:40px;
+  z-index:1000;align-items:center;justify-content:center;padding:40px;
 }
 .modal{
   background:var(--sur);border:1px solid var(--bdr);border-radius:18px;
   padding:40px;width:100%;max-width:360px;
 }
-.modal h3{font-size:40px;margin-bottom:16px;color:var(--acc);}
+.modal h3{font-size:16px;margin-bottom:16px;color:var(--acc);}
 .fg{margin-bottom:12px;}
 .fg label{display:block;font-size:27px;color:var(--txt2);margin-bottom:4px;}
 .fg input{width:100%;}
@@ -194,7 +195,6 @@ input:focus{outline:none;border-color:var(--acc);}
 .legend-labels span{font-family:var(--mono);}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
 
@@ -208,12 +208,11 @@ input:focus{outline:none;border-color:var(--acc);}
 <!-- ヒートマップ（画面いっぱい正方形） -->
 <div class="map-wrap" id="mapWrap">
   <div id="leafletMap" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></div>
-<!-- 4隅ボタン: fixed配置でLeafletの影響を受けない -->
-<button class="corner-btn" id="cornerTL" style="position:fixed;top:72px;left:6px;z-index:999;" disabled>左上<br>記録</button>
-<button class="corner-btn" id="cornerTR" style="position:fixed;top:72px;right:6px;z-index:999;" disabled>右上<br>記録</button>
-<button class="corner-btn" id="cornerBL" style="position:fixed;top:calc(72px + 100vw - 110px);left:6px;z-index:999;" disabled>左下<br>記録</button>
-<button class="corner-btn" id="cornerBR" style="position:fixed;top:calc(72px + 100vw - 110px);right:6px;z-index:999;" disabled>右下<br>記録</button>
   <canvas id="heatmap" style="position:absolute;top:0;left:0;z-index:2;pointer-events:none;"></canvas>
+  <button class="corner-btn corner-tl" id="cornerTL" style="z-index:999;" disabled>左上<br>記録</button>
+  <button class="corner-btn corner-tr" id="cornerTR" style="z-index:999;" disabled>右上<br>記録</button>
+  <button class="corner-btn corner-bl" id="cornerBL" style="z-index:999;" disabled>左下<br>記録</button>
+  <button class="corner-btn corner-br" id="cornerBR" style="z-index:999;" disabled>右下<br>記録</button>
   <!-- センターマーカー -->
   <svg class="center-mark" id="centerMark" style="display:none;z-index:20;" viewBox="0 0 24 24">
     <line x1="12" y1="2" x2="12" y2="22" stroke="#ffaa00" stroke-width="2"/>
@@ -326,11 +325,14 @@ input:focus{outline:none;border-color:var(--acc);}
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 // ════════════════════════════════════════════
 //  DB
 // ════════════════════════════════════════════
 const AREAS = ['白根', '潟東', '金巻'];
+let showSelfMarker = true;
+let selfMarker = { lat:null, lon:null, alt:null };
 let currentArea = AREAS[0];
 let db = { '白根':{fields:[]}, '潟東':{fields:[]}, '金巻':{fields:[]} };
 
@@ -670,7 +672,8 @@ function altColor(t) {
 }
 
 function drawHeatmap() {
-  const W = canvas.width || window.innerWidth;
+  resizeCanvas();
+  const W = canvas.width;
   const H = W;
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#0a0e1a'; ctx.fillRect(0,0,W,H);
@@ -699,143 +702,172 @@ function drawHeatmap() {
   const pad = 20;
   const plotW = W-pad*2, plotH = H-pad*2;
 
-  // ── 座標変換: 4隅のGPS座標を基準にcanvas座標を決める ──
-  // 4隅が全部ある場合は4点アフィン変換
-  // 4隅が揃っていない場合は単純なGPS→canvas変換
+  // canvas上の4隅の座標（固定）
+  const canvCorners = {
+    tl:[pad,       pad      ],
+    tr:[pad+plotW, pad      ],
+    bl:[pad,       pad+plotH],
+    br:[pad+plotW, pad+plotH],
+  };
+
   const hasTL = cr2.tl&&cr2.tl.lat!=null;
   const hasTR = cr2.tr&&cr2.tr.lat!=null;
   const hasBL = cr2.bl&&cr2.bl.lat!=null;
   const hasBR = cr2.br&&cr2.br.lat!=null;
-  const cornerCount = [hasTL,hasTR,hasBL,hasBR].filter(Boolean).length;
 
-  // canvas上の4隅の座標（固定）
-  const canvCorners = {
-    tl:[pad,      pad      ],
-    tr:[pad+plotW,pad      ],
-    bl:[pad,      pad+plotH],
-    br:[pad+plotW,pad+plotH],
-  };
-
+  // GPS→canvas座標変換（4隅基準の双線形補間）
   function latLonToCanvas(lat, lon) {
-    // 4隅のGPS→canvas座標の線形マッピング
-    // 利用可能な4隅から双線形補間で変換
+    // 4隅のGPS座標→canvas座標の対応から双線形補間
+    // 左上ボタン押した場所=canvas左上、右上=canvas右上、左下=canvas左下、右下=canvas右下
+    // この対応は絶対に変わらない
+    const cpMap = {
+      tl:[pad,      pad      ],
+      tr:[pad+plotW,pad      ],
+      bl:[pad,      pad+plotH],
+      br:[pad+plotW,pad+plotH],
+    };
+
     if (hasTL && hasTR && hasBL && hasBR) {
       // 4隅全部ある: 双線形補間
-      const latMax2=Math.max(cr2.tl.lat,cr2.tr.lat);
-      const latMin2=Math.min(cr2.bl.lat,cr2.br.lat);
-      const lonMin2=Math.min(cr2.tl.lon,cr2.bl.lon);
-      const lonMax2=Math.max(cr2.tr.lon,cr2.br.lon);
-      const tx=(lon-lonMin2)/Math.max(lonMax2-lonMin2,0.000001);
-      const ty=(latMax2-lat)/Math.max(latMax2-latMin2,0.000001);
-      return [pad+tx*plotW, pad+ty*plotH];
-    } else if (cornerCount >= 2) {
-      // 2〜3隅: 利用可能な隅から線形変換
-      const refs=[];
-      if(hasTL)refs.push({gLat:cr2.tl.lat,gLon:cr2.tl.lon,cx:canvCorners.tl[0],cy:canvCorners.tl[1]});
-      if(hasTR)refs.push({gLat:cr2.tr.lat,gLon:cr2.tr.lon,cx:canvCorners.tr[0],cy:canvCorners.tr[1]});
-      if(hasBL)refs.push({gLat:cr2.bl.lat,gLon:cr2.bl.lon,cx:canvCorners.bl[0],cy:canvCorners.bl[1]});
-      if(hasBR)refs.push({gLat:cr2.br.lat,gLon:cr2.br.lon,cx:canvCorners.br[0],cy:canvCorners.br[1]});
-      const lats2=refs.map(r=>r.gLat), lons2=refs.map(r=>r.gLon);
-      const laMax2=Math.max(...lats2),laMin2=Math.min(...lats2);
-      const loMin2=Math.min(...lons2),loMax2=Math.max(...lons2);
-      const cxMin=Math.min(...refs.map(r=>r.cx)),cxMax=Math.max(...refs.map(r=>r.cx));
-      const cyMin=Math.min(...refs.map(r=>r.cy)),cyMax=Math.max(...refs.map(r=>r.cy));
-      const tx=(lon-loMin2)/Math.max(loMax2-loMin2,0.000001);
-      const ty=(laMax2-lat)/Math.max(laMax2-laMin2,0.000001);
-      return [cxMin+tx*(cxMax-cxMin), cyMin+ty*(cyMax-cyMin)];
-    } else {
-      // 4隅なし: GPS範囲でスケーリング
-      const allLats=pts.map(p=>p.lat).filter(v=>v!=null);
-      const allLons=pts.map(p=>p.lon).filter(v=>v!=null);
-      if(allLats.length<2) return [W/2,H/2];
-      const laMax2=Math.max(...allLats),laMin2=Math.min(...allLats);
-      const loMin2=Math.min(...allLons),loMax2=Math.max(...allLons);
-      const laR2=Math.max(laMax2-laMin2,0.000001),loR2=Math.max(loMax2-loMin2,0.000001);
-      return [pad+((lon-loMin2)/loR2)*plotW, pad+((laMax2-lat)/laR2)*plotH];
+      // GPS座標の4隅を使ってX方向とY方向を独立に補間
+      // 上辺(TL→TR)でのX位置
+      const topDLon = cr2.tr.lon - cr2.tl.lon;
+      const topDLat = cr2.tr.lat - cr2.tl.lat;
+      const topLen = Math.sqrt(topDLon*topDLon + topDLat*topDLat) || 0.000001;
+      // 下辺(BL→BR)でのX位置
+      const botDLon = cr2.br.lon - cr2.bl.lon;
+      const botDLat = cr2.br.lat - cr2.bl.lat;
+      const botLen = Math.sqrt(botDLon*botDLon + botDLat*botDLat) || 0.000001;
+      // 左辺(TL→BL)でのY位置
+      const lftDLon = cr2.bl.lon - cr2.tl.lon;
+      const lftDLat = cr2.bl.lat - cr2.tl.lat;
+      const lftLen = Math.sqrt(lftDLon*lftDLon + lftDLat*lftDLat) || 0.000001;
+      // 右辺(TR→BR)でのY位置
+      const rgtDLon = cr2.br.lon - cr2.tr.lon;
+      const rgtDLat = cr2.br.lat - cr2.tr.lat;
+      const rgtLen = Math.sqrt(rgtDLon*rgtDLon + rgtDLat*rgtDLat) || 0.000001;
+
+      // 上辺上でのTLからの距離比率→tx_top
+      const dTopLon = lon - cr2.tl.lon;
+      const dTopLat = lat - cr2.tl.lat;
+      const tx_top = Math.max(0,Math.min(1,(dTopLon*topDLon + dTopLat*topDLat) / (topLen*topLen)));
+
+      // 下辺上でのBLからの距離比率→tx_bot
+      const dBotLon = lon - cr2.bl.lon;
+      const dBotLat = lat - cr2.bl.lat;
+      const tx_bot = Math.max(0,Math.min(1,(dBotLon*botDLon + dBotLat*botDLat) / (botLen*botLen)));
+
+      // 左辺上でのTLからの距離比率→ty_lft
+      const dLftLon = lon - cr2.tl.lon;
+      const dLftLat = lat - cr2.tl.lat;
+      const ty_lft = Math.max(0,Math.min(1,(dLftLon*lftDLon + dLftLat*lftDLat) / (lftLen*lftLen)));
+
+      // 右辺上でのTRからの距離比率→ty_rgt
+      const dRgtLon = lon - cr2.tr.lon;
+      const dRgtLat = lat - cr2.tr.lat;
+      const ty_rgt = Math.max(0,Math.min(1,(dRgtLon*rgtDLon + dRgtLat*rgtDLat) / (rgtLen*rgtLen)));
+
+      // ty_lftとty_rgtの平均でY方向の位置を決める
+      const ty = (ty_lft + ty_rgt) / 2;
+      // tx_topとtx_botの平均でX方向の位置を決める
+      const tx = (tx_top + tx_bot) / 2;
+
+      return [pad + tx*plotW, pad + ty*plotH];
     }
+
+    // 4隅なし: 走行点の範囲でスケーリング
+    const allLats = pts.map(p=>p.lat).filter(v=>v!=null);
+    const allLons = pts.map(p=>p.lon).filter(v=>v!=null);
+    if (allLats.length < 2) return [W/2, H/2];
+    const laMax2 = Math.max(...allLats), laMin2 = Math.min(...allLats);
+    const loMin2 = Math.min(...allLons), loMax2 = Math.max(...allLons);
+    return [
+      pad + ((lon-loMin2) / Math.max(loMax2-loMin2, 0.000001)) * plotW,
+      pad + ((laMax2-lat) / Math.max(laMax2-laMin2, 0.000001)) * plotH
+    ];
   }
 
-  // 全既知点をcanvas座標に変換
+  // 走行点をcanvas座標に変換（色の計算に使う）
   const known = pts.filter(p=>p.lat!=null).map(p=>{
-    const [px,py]=latLonToCanvas(p.lat,p.lon);
-    return {px,py,alt:p.alt};
+    const [px,py] = latLonToCanvas(p.lat, p.lon);
+    return {px, py, alt: p.alt};
   });
-  // 4隅も追加
+
+  // 4隅も補間に追加
   ['tl','tr','bl','br'].forEach(k=>{
-    if(cr2[k]&&cr2[k].lat!=null){
-      known.push({px:canvCorners[k][0],py:canvCorners[k][1],alt:cr2[k].alt});
+    if (cr2[k] && cr2[k].lat!=null) {
+      known.push({px: canvCorners[k][0], py: canvCorners[k][1], alt: cr2[k].alt});
     }
   });
 
-  if(known.length<2){
+  if (known.length < 2) {
     ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='13px sans-serif';
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('データが不足しています',W/2,H/2); return;
+    ctx.fillText('データ不足',W/2,H/2); return;
   }
 
-  // 統計
-  const alts=known.map(k=>k.alt);
-  const altMax=Math.max(...alts),altMin2=Math.min(...alts);
-  const maxDev=Math.max(Math.abs(altMax-altCenter),Math.abs(altMin2-altCenter),0.001);
-  const spread=maxDev*2;
+  // 統計: 走行点のみで計算（4隅は含めない）
+  const ptAlts = pts.map(p=>p.alt);
+  const altMax = Math.max(...ptAlts);
+  const altMin2 = Math.min(...ptAlts);
+  const maxDev = Math.max(Math.abs(altMax-altCenter), Math.abs(altMin2-altCenter), 0.001);
+  const spread = maxDev * 2;
 
   document.getElementById('statusBar').style.display='flex';
   const hiCm=(altMax-altCenter)*100, loCm=(altMin2-altCenter)*100;
-  document.getElementById('statHi').textContent    =(hiCm>=0?'+':'')+hiCm.toFixed(1);
-  document.getElementById('statLo').textContent    =(loCm>=0?'+':'')+loCm.toFixed(1);
-  document.getElementById('statRange').textContent =((altMax-altMin2)*100).toFixed(1);
-  document.getElementById('statPoints').textContent=pts.length+'点';
-  document.getElementById('legHi').textContent=(hiCm>=0?'+':'')+hiCm.toFixed(1)+' cm';
-  document.getElementById('legLo').textContent=(loCm>=0?'+':'')+loCm.toFixed(1)+' cm';
+  document.getElementById('statHi').textContent    = (hiCm>=0?'+':'')+hiCm.toFixed(1);
+  document.getElementById('statLo').textContent    = (loCm>=0?'+':'')+loCm.toFixed(1);
+  document.getElementById('statRange').textContent = ((altMax-altMin2)*100).toFixed(1);
+  document.getElementById('statPoints').textContent = pts.length+'点';
+  document.getElementById('legHi').textContent = (hiCm>=0?'+':'')+hiCm.toFixed(1)+' cm';
+  document.getElementById('legLo').textContent = (loCm>=0?'+':'')+loCm.toFixed(1)+' cm';
   document.getElementById('legendLabels').style.display='flex';
 
   // IDW補間してヒートマップ描画
-  const res=4,cols=Math.ceil(plotW/res),rows2=Math.ceil(plotH/res);
-  const imgData=ctx.createImageData(cols*res,rows2*res);
-  for(let r=0;r<rows2;r++) for(let cc=0;cc<cols;cc++){
-    const x=pad+cc*res, y=pad+r*res;
-    const v=known.length===1?known[0].alt:idw(known,x,y);
-    const norm=Math.max(0,Math.min(1,0.5+(v-altCenter)/spread));
-    const [cr,cg,cb]=altColor(norm);
-    for(let dy=0;dy<res;dy++) for(let dx=0;dx<res;dx++){
-      const idx=((r*res+dy)*(cols*res)+cc*res+dx)*4;
-      imgData.data[idx]=cr;imgData.data[idx+1]=cg;imgData.data[idx+2]=cb;imgData.data[idx+3]=220;
+  const res=4, cols=Math.ceil(plotW/res), rows2=Math.ceil(plotH/res);
+  const imgData = ctx.createImageData(cols*res, rows2*res);
+  for (let r=0; r<rows2; r++) for (let cc=0; cc<cols; cc++) {
+    const x = pad+cc*res, y = pad+r*res;
+    const v = known.length===1 ? known[0].alt : idw(known, x, y);
+    const norm = Math.max(0, Math.min(1, 0.5+(v-altCenter)/spread));
+    const [cr,cg,cb] = altColor(norm);
+    for (let dy=0; dy<res; dy++) for (let dx=0; dx<res; dx++) {
+      const idx = ((r*res+dy)*(cols*res)+cc*res+dx)*4;
+      imgData.data[idx]=cr; imgData.data[idx+1]=cg; imgData.data[idx+2]=cb; imgData.data[idx+3]=220;
     }
   }
-  const oc=new OffscreenCanvas(cols*res,rows2*res);
-  oc.getContext('2d').putImageData(imgData,0,0);
-  ctx.drawImage(oc,pad,pad,plotW,plotH);
+  const oc = new OffscreenCanvas(cols*res, rows2*res);
+  oc.getContext('2d').putImageData(imgData, 0, 0);
+  ctx.drawImage(oc, pad, pad, plotW, plotH);
 
   // 枠線
-  ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1;
-  ctx.strokeRect(pad,pad,plotW,plotH);
+  ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+  ctx.strokeRect(pad, pad, plotW, plotH);
 
-  // 4隅マーカー
+  // 4隅マーカー（緑の丸）
   ['tl','tr','bl','br'].forEach(k=>{
-    if(!cr2[k]) return;
-    const [x,y]=canvCorners[k];
-    ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);
-    ctx.fillStyle='#00ff88';ctx.fill();
-    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    if (!cr2[k]) return;
+    const [x,y] = canvCorners[k];
+    ctx.beginPath(); ctx.arc(x,y,10,0,Math.PI*2);
+    ctx.fillStyle='#00ff88'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
   });
 
-  // 現在位置マーカー
-  if(showSelfMarker&&selfMarker&&selfMarker.lat!=null){
-    const [mx,my]=latLonToCanvas(selfMarker.lat,selfMarker.lon);
-    if(mx>=pad&&mx<=pad+plotW&&my>=pad&&my<=pad+plotH){
-      ctx.beginPath();ctx.arc(mx,my,12,0,Math.PI*2);
-      ctx.fillStyle='#00d4aa';ctx.fill();
-      ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.stroke();
-      // 進行方向の矢印
-      ctx.fillStyle='#fff';
-      ctx.font='bold 12px sans-serif';
-      ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText('●',mx,my);
+  // 自機マーカー
+  if (showSelfMarker && selfMarker && selfMarker.lat!=null) {
+    const [mx,my] = latLonToCanvas(selfMarker.lat, selfMarker.lon);
+    if (mx>=pad && mx<=pad+plotW && my>=pad && my<=pad+plotH) {
+      ctx.beginPath(); ctx.arc(mx,my,12,0,Math.PI*2);
+      ctx.fillStyle='#00d4aa'; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('自',mx,my);
     }
   }
 
   // 地図オーバーレイ
-  setTimeout(overlayHeatmapOnMap,0);
+  setTimeout(overlayHeatmapOnMap, 0);
 }
 
 
@@ -885,8 +917,6 @@ function overlayHeatmapOnMap() {
 // ════════════════════════════════════════════
 //  自機位置 表示/非表示
 // ════════════════════════════════════════════
-let showSelfMarker = true;
-let selfMarker = { lat:null, lon:null, alt:null };
 
 const _toggleSelfBtn = document.getElementById('btnToggleSelf');
 if (_toggleSelfBtn) _toggleSelfBtn.onclick = () => {
