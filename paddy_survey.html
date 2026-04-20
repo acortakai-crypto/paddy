@@ -793,9 +793,12 @@ document.getElementById('btnEndMeasure').onclick = () => {
 // ════════════════════════════════════════════
 //  初期化
 // ════════════════════════════════════════════
-renderFieldList();
-if (areaFields().length > 0) selectField(areaFields()[0].id);
-else drawHeatmap();
+window.addEventListener('DOMContentLoaded', () => {
+  resizeCanvas();
+  renderFieldList();
+  if (areaFields().length > 0) selectField(areaFields()[0].id);
+  else drawHeatmap();
+});
 
 </script>
 </body>
