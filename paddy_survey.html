@@ -5,234 +5,99 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Permissions-Policy" content="geolocation=*">
 <title>圃場高低差測定</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-:root{
-  --bg:#080d1a;--sur:#0f1724;--sur2:#172030;--bdr:#243048;
-  --acc:#00d4aa;--acc2:#2288ff;--txt:#ddeaff;--txt2:#6a80a8;
-  --red:#ff4040;--grn:#22cc55;--ora:#ffaa00;
-  --font:"Noto Sans JP",sans-serif;--mono:"JetBrains Mono",monospace;
-}
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
-html,body{
-  width:100%;background:var(--bg);color:var(--txt);
-  font-family:var(--font);font-size:16px;
-  -webkit-tap-highlight-color:transparent;
-  touch-action:manipulation;
-  overflow-x:hidden;
-}
-
-/* ══ トップバー ══ */
-.topbar{
-  position:sticky;top:0;z-index:100;
-  background:var(--sur);border-bottom:1px solid var(--bdr);
-  display:flex;align-items:center;padding:0 32px;height:72px;gap:10px;
-}
-.logo{font-weight:700;font-size:16px;color:var(--acc);}
-.logo span{color:var(--txt2);font-weight:400;}
-.badge{font-size:22px;border:1px solid rgba(0,212,170,.35);color:var(--acc);padding:2px 12px;border-radius:4px;font-family:var(--mono);}
-.conn-dot{width:8px;height:8px;border-radius:50%;background:#444;margin-left:auto;flex-shrink:0;}
+:root{--bg:#080d1a;--sur:#0f1724;--sur2:#172030;--bdr:#243048;--acc:#00d4aa;--txt:#ddeaff;--txt2:#6a80a8;--red:#ff4040;--grn:#22cc55;--ora:#ffaa00;}
+html,body{width:100%;background:var(--bg);color:var(--txt);font-family:sans-serif;font-size:15px;-webkit-tap-highlight-color:transparent;touch-action:manipulation;overflow-x:hidden;}
+.topbar{position:sticky;top:0;z-index:100;background:var(--sur);border-bottom:1px solid var(--bdr);display:flex;align-items:center;padding:0 12px;height:48px;gap:8px;}
+.logo{font-weight:700;font-size:15px;color:var(--acc);}
+.badge{font-size:10px;border:1px solid rgba(0,212,170,.4);color:var(--acc);padding:2px 6px;border-radius:3px;}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#333;margin-left:auto;}
 .conn-dot.on{background:var(--acc);box-shadow:0 0 6px var(--acc);}
-.conn-dot.ora{background:var(--ora);animation:blink .8s infinite;}
-@keyframes blink{50%{opacity:.2}}
-
-/* ══ ヒートマップ（画面いっぱい） ══ */
-.map-wrap{
-  position:relative;
-  width:100vw;
-  height:100vw;
-  background:#0a0e1a;
-}
-#heatmap{position:absolute;top:0;left:0;display:block;}
-
-/* 4隅ボタン */
-.corner-btn{
-  position:absolute;width:110px;height:110px;
-  border-radius:50%;border:4px solid var(--acc);
-  background:rgba(0,212,170,.35);color:var(--acc);
-  font-size:18px;font-weight:700;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  text-align:center;line-height:1.4;
-  -webkit-tap-highlight-color:transparent;
-  transition:background .15s;
-  z-index:999;
-}
-.corner-btn:active{background:rgba(0,212,170,.4);}
-.corner-btn.done{background:rgba(0,212,170,.35);border-color:var(--grn);color:var(--grn);}
-.corner-btn:disabled{opacity:.3;pointer-events:none;}
-.corner-tl{top:8px;left:8px;}
-.corner-tr{top:8px;right:8px;}
-.corner-bl{bottom:8px;left:8px;}
-.corner-br{bottom:8px;right:8px;}
-
-/* センターマーカー */
-.center-mark{
-  position:absolute;top:50%;left:50%;
-  transform:translate(-50%,-50%);
-  width:24px;height:24px;pointer-events:none;
-}
-
-/* ステータスバー */
-.status-bar{
-  background:var(--sur);border-bottom:1px solid var(--bdr);
-  display:flex;gap:0;overflow-x:auto;
-}
-.stat-item{
-  flex:1;min-width:90px;padding:24px 8px;text-align:center;
-  border-right:1px solid var(--bdr);
-}
+.map-wrap{position:relative;width:100vw;height:100vw;background:#0a0e1a;overflow:hidden;}
+#leafletMap{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;}
+#heatmap{position:absolute;top:0;left:0;z-index:2;pointer-events:none;}
+.corner-btn{position:absolute;width:80px;height:80px;border-radius:50%;border:3px solid var(--acc);background:rgba(0,212,170,.2);color:var(--acc);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.3;z-index:10;cursor:pointer;}
+.corner-btn.done{background:rgba(34,204,85,.3);border-color:var(--grn);color:var(--grn);}
+.corner-btn:disabled{opacity:.25;pointer-events:none;}
+.corner-tl{top:6px;left:6px;}.corner-tr{top:6px;right:6px;}.corner-bl{bottom:6px;left:6px;}.corner-br{bottom:6px;right:6px;}
+.status-bar{background:var(--sur);border-bottom:1px solid var(--bdr);display:flex;}
+.stat-item{flex:1;padding:8px 4px;text-align:center;border-right:1px solid var(--bdr);}
 .stat-item:last-child{border-right:none;}
-.stat-v{font-family:var(--mono);font-size:16px;font-weight:700;}
-.stat-l{font-size:27px;color:var(--txt2);margin-top:3px;}
-
-/* ══ コントロールパネル（スクロール領域） ══ */
-.panel{padding:40px 32px;display:flex;flex-direction:column;gap:18px;}
-
-/* セクション */
-.sec{background:var(--sur);border-radius:15px;overflow:hidden;}
-.sec-hd{
-  padding:28px 32px;font-size:14px;font-weight:700;
-  letter-spacing:.1em;color:var(--txt2);text-transform:uppercase;
-  border-bottom:1px solid var(--bdr);background:var(--sur2);
-}
-.sec-body{padding:32px;display:flex;flex-direction:column;gap:14px;}
-
-/* ボタン */
-.btn{
-  display:flex;align-items:center;justify-content:center;gap:6px;
-  padding:28px;border-radius:15px;border:1px solid var(--bdr);
-  background:var(--sur2);color:var(--txt);font-family:var(--font);
-  font-size:16px;cursor:pointer;transition:opacity .15s;width:100%;
-}
+.stat-v{font-size:13px;font-weight:700;}
+.stat-l{font-size:10px;color:var(--txt2);margin-top:2px;}
+.panel{padding:14px;display:flex;flex-direction:column;gap:12px;}
+.sec{background:var(--sur);border-radius:10px;overflow:hidden;}
+.sec-hd{padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--txt2);text-transform:uppercase;border-bottom:1px solid var(--bdr);background:var(--sur2);}
+.sec-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+.btn{display:flex;align-items:center;justify-content:center;padding:12px;border-radius:8px;border:1px solid var(--bdr);background:var(--sur2);color:var(--txt);font-size:14px;cursor:pointer;width:100%;}
 .btn:active{opacity:.7;}
 .btn.acc{background:var(--acc);border-color:var(--acc);color:#000;font-weight:700;}
 .btn.red{border-color:var(--red);color:var(--red);}
 .btn.ora{background:linear-gradient(135deg,#ffaa00,#ff6600);border:none;color:#000;font-weight:700;}
-.btn.grn{background:var(--grn);border-color:var(--grn);color:#000;font-weight:700;}
 .btn:disabled{opacity:.3;pointer-events:none;}
-.btn-row{display:flex;gap:8px;}
-.btn-row .btn{flex:1;}
-
-/* GPS情報 */
+.btn-row{display:flex;gap:8px;}.btn-row .btn{flex:1;}
 .gps-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.gps-item{background:var(--sur2);border:1px solid var(--bdr);border-radius:15px;padding:24px 28px;}
-.gps-lbl{font-size:12px;color:var(--txt2);margin-bottom:4px;}
-.gps-val{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--acc);}
-
-/* ログ */
-.nmea{
-  background:var(--sur2);border:1px solid var(--bdr);border-radius:9px;
-  padding:16px 20px;font-family:var(--mono);font-size:25px;color:var(--txt2);
-  min-height:44px;white-space:pre-wrap;word-break:break-all;line-height:1.6;font-size:30px;
-}
-
-/* エリアボタン */
+.gps-item{background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;}
+.gps-lbl{font-size:10px;color:var(--txt2);margin-bottom:2px;}
+.gps-val{font-size:16px;font-weight:700;color:var(--acc);}
+.nmea{background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--txt2);min-height:36px;white-space:pre-wrap;word-break:break-all;}
 .area-btns{display:flex;gap:8px;}
-.area-btn{
-  flex:1;padding:28px 8px;border-radius:15px;border:1px solid var(--bdr);
-  background:var(--sur2);color:var(--txt2);font-family:var(--font);
-  font-size:17px;font-weight:700;cursor:pointer;text-align:center;
-  transition:all .15s;
-}
+.area-btn{flex:1;padding:10px 4px;border-radius:8px;border:1px solid var(--bdr);background:var(--sur2);color:var(--txt2);font-size:15px;font-weight:700;cursor:pointer;text-align:center;}
 .area-btn.active{background:var(--acc);border-color:var(--acc);color:#000;}
-
-/* 圃場リスト */
 .field-list{display:flex;flex-direction:column;gap:8px;}
-.fc{
-  background:var(--sur2);border:1px solid var(--bdr);border-radius:15px;
-  padding:32px;cursor:pointer;transition:border-color .15s;
-}
+.fc{background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;cursor:pointer;}
 .fc.active{border-color:var(--acc);}
-.fc-name{font-size:17px;font-weight:700;color:var(--txt);margin-bottom:6px;}
-.fc-meta{font-size:13px;color:var(--txt2);}
-
-/* 基準点 */
-.ref-box{
-  background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;
-  padding:24px 28px;display:flex;align-items:center;gap:10px;
-}
-.ref-val{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--ora);flex:1;}
-
-/* 入力 */
+.fc-name{font-size:15px;font-weight:700;margin-bottom:4px;}
+.fc-meta{font-size:11px;color:var(--txt2);}
+.ref-box{background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;}
+.ref-val{font-size:18px;font-weight:700;color:var(--ora);flex:1;}
 .input-row{display:flex;align-items:center;gap:8px;}
 .input-row label{font-size:12px;color:var(--txt2);white-space:nowrap;}
-input[type=number],input[type=text]{
-  background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;
-  color:var(--txt);font-size:16px;padding:24px 28px;font-family:var(--font);
-}
-input[type=number]{width:72px;text-align:center;}
+input[type=number],input[type=text]{background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-size:14px;padding:8px 10px;font-family:sans-serif;}
+input[type=number]{width:60px;text-align:center;}
 input[type=text]{flex:1;}
 input:focus{outline:none;border-color:var(--acc);}
-
-/* オートステータス */
-.auto-status{font-size:15px;color:var(--txt2);text-align:center;padding:12px 0;}
-
-/* モーダル */
-.modal-ov{
-  display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
-  z-index:1000;align-items:center;justify-content:center;padding:40px;
-}
-.modal{
-  background:var(--sur);border:1px solid var(--bdr);border-radius:18px;
-  padding:40px;width:100%;max-width:360px;
-}
+.auto-status{font-size:13px;color:var(--txt2);text-align:center;padding:4px 0;}
+.legend-bar{flex:1;height:10px;border-radius:5px;background:linear-gradient(to right,#1e64ff,#22c837,#dc2b2b);}
+.legend-labels{display:flex;justify-content:space-between;font-size:10px;margin-top:2px;}
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+.modal{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:20px;width:100%;max-width:360px;}
 .modal h3{font-size:16px;margin-bottom:16px;color:var(--acc);}
 .fg{margin-bottom:12px;}
-.fg label{display:block;font-size:27px;color:var(--txt2);margin-bottom:4px;}
+.fg label{display:block;font-size:11px;color:var(--txt2);margin-bottom:4px;}
 .fg input{width:100%;}
 .modal-act{display:flex;gap:8px;margin-top:16px;}
 .modal-act .btn{flex:1;}
-
-/* legend */
-.legend-wrap{
-  display:flex;align-items:center;gap:8px;padding:0 8px;
-}
-.legend-bar{
-  flex:1;height:10px;border-radius:7px;
-  background:linear-gradient(to right,#1e64ff,#22c837,#dc2b2b);
-}
-.legend-labels{display:flex;justify-content:space-between;font-size:25px;margin-top:2px;}
-.legend-labels span{font-family:var(--mono);}
 </style>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 </head>
 <body>
-
-<!-- トップバー -->
 <div class="topbar">
-  <div class="logo">田んぼ高低差 <span>SURVEY</span></div>
+  <div class="logo">田んぼ高低差 <span style="color:var(--txt2);font-weight:400">SURVEY</span></div>
   <div class="badge">DG-PRO1RWS</div>
   <div class="conn-dot" id="connDot"></div>
 </div>
-
-<!-- ヒートマップ（画面いっぱい正方形） -->
 <div class="map-wrap" id="mapWrap">
-  <div id="leafletMap" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></div>
-  <canvas id="heatmap" style="position:absolute;top:0;left:0;z-index:2;pointer-events:none;"></canvas>
-  <button class="corner-btn corner-tl" id="cornerTL" style="z-index:999;" disabled>左上<br>記録</button>
-  <button class="corner-btn corner-tr" id="cornerTR" style="z-index:999;" disabled>右上<br>記録</button>
-  <button class="corner-btn corner-bl" id="cornerBL" style="z-index:999;" disabled>左下<br>記録</button>
-  <button class="corner-btn corner-br" id="cornerBR" style="z-index:999;" disabled>右下<br>記録</button>
-  <!-- センターマーカー -->
-  <svg class="center-mark" id="centerMark" style="display:none;z-index:20;" viewBox="0 0 24 24">
+  <div id="leafletMap"></div>
+  <canvas id="heatmap"></canvas>
+  <button class="corner-btn corner-tl" id="cornerTL" disabled>左上<br>記録</button>
+  <button class="corner-btn corner-tr" id="cornerTR" disabled>右上<br>記録</button>
+  <button class="corner-btn corner-bl" id="cornerBL" disabled>左下<br>記録</button>
+  <button class="corner-btn corner-br" id="cornerBR" disabled>右下<br>記録</button>
+  <svg id="centerMark" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:32px;height:32px;z-index:10;" viewBox="0 0 24 24">
     <line x1="12" y1="2" x2="12" y2="22" stroke="#ffaa00" stroke-width="2"/>
     <line x1="2" y1="12" x2="22" y2="12" stroke="#ffaa00" stroke-width="2"/>
     <circle cx="12" cy="12" r="3" fill="#ffaa00"/>
   </svg>
 </div>
-
-<!-- ステータスバー -->
 <div class="status-bar" id="statusBar" style="display:none">
   <div class="stat-item"><div class="stat-v" style="color:var(--red)" id="statHi">—</div><div class="stat-l">最高(cm)</div></div>
   <div class="stat-item"><div class="stat-v" style="color:#5588ff" id="statLo">—</div><div class="stat-l">最低(cm)</div></div>
   <div class="stat-item"><div class="stat-v" style="color:var(--acc)" id="statRange">—</div><div class="stat-l">高低差(cm)</div></div>
   <div class="stat-item"><div class="stat-v" style="color:var(--txt2)" id="statPoints">—</div><div class="stat-l">測定点</div></div>
 </div>
-
-<!-- スクロール領域 -->
 <div class="panel">
-
-  <!-- GPS接続 -->
   <div class="sec">
     <div class="sec-hd">GPS接続</div>
     <div class="sec-body">
@@ -249,8 +114,6 @@ input:focus{outline:none;border-color:var(--acc);}
       </div>
     </div>
   </div>
-
-  <!-- エリア選択 -->
   <div class="sec">
     <div class="sec-hd">エリア選択</div>
     <div class="sec-body">
@@ -261,29 +124,20 @@ input:focus{outline:none;border-color:var(--acc);}
       </div>
     </div>
   </div>
-
-  <!-- 圃場管理 -->
   <div class="sec">
     <div class="sec-hd">圃場 <span id="fieldCount" style="color:var(--acc)">0</span>枚</div>
     <div class="sec-body">
       <div class="input-row">
-        <label>X</label>
-        <input type="number" id="gridX" value="5" min="1" max="30">
-        <label>Y</label>
-        <input type="number" id="gridY" value="4" min="1" max="30">
+        <label>X</label><input type="number" id="gridX" value="5" min="1" max="30">
+        <label>Y</label><input type="number" id="gridY" value="4" min="1" max="30">
         <button class="btn acc" id="btnNewField" style="flex:1">＋新規作成</button>
       </div>
-      <div class="field-list" id="fieldList">
-        <div style="font-size:12px;color:var(--txt2);padding:4px">圃場がありません</div>
-      </div>
+      <div class="field-list" id="fieldList"><div style="font-size:12px;color:var(--txt2)">圃場がありません</div></div>
     </div>
   </div>
-
-  <!-- 選択中圃場の測定（圃場選択後に表示） -->
   <div class="sec" id="measureSec" style="display:none">
     <div class="sec-hd" id="mainTitle">圃場名</div>
     <div class="sec-body">
-      <!-- 基準点 -->
       <div class="ref-box">
         <div style="font-size:11px;color:var(--txt2);line-height:1.4">センター<br>基準高度</div>
         <div class="ref-val" id="centerAltDisplay">未記録</div>
@@ -291,10 +145,9 @@ input:focus{outline:none;border-color:var(--acc);}
       </div>
       <button class="btn ora" id="btnMeasure" disabled>🎯 ここを基準点に設定</button>
       <div class="auto-status" id="autoRecordStatus">4隅のどれかを押すと記録開始</div>
-      <button class="btn" id="btnToggleSelf" style="margin-top:4px;">自機位置 表示中</button>
-      <!-- legend -->
+      <button class="btn" id="btnToggleSelf">自機位置 表示中</button>
       <div>
-        <div class="legend-wrap">
+        <div style="display:flex;align-items:center;gap:8px;padding:0 4px">
           <span style="font-size:10px;color:var(--txt2)">低</span>
           <div class="legend-bar"></div>
           <span style="font-size:10px;color:var(--txt2)">高</span>
@@ -305,14 +158,10 @@ input:focus{outline:none;border-color:var(--acc);}
           <span id="legHi" style="color:var(--red)">—</span>
         </div>
       </div>
-      <!-- 測定終了 -->
-      <button class="btn red" id="btnEndMeasure" style="margin-top:4px">■ 測定終了（圃場選択に戻る）</button>
+      <button class="btn red" id="btnEndMeasure">■ 測定終了（圃場選択に戻る）</button>
     </div>
   </div>
-
 </div>
-
-<!-- モーダル -->
 <div class="modal-ov" id="modalOverlay">
   <div class="modal">
     <h3>新規圃場を作成</h3>
@@ -324,9 +173,10 @@ input:focus{outline:none;border-color:var(--acc);}
     </div>
   </div>
 </div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
+
+
 // ════════════════════════════════════════════
 //  DB
 // ════════════════════════════════════════════
@@ -945,6 +795,7 @@ document.getElementById('btnEndMeasure').onclick = () => {
 // ════════════════════════════════════════════
 renderFieldList();
 if (areaFields().length > 0) selectField(areaFields()[0].id);
+
 </script>
 </body>
 </html>
